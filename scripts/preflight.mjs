@@ -6,6 +6,7 @@ const steps = [
   ['ESLint', 'pnpm lint'],
   ['TypeScript Typecheck', 'pnpm typecheck'],
   ['Unit & Integration Tests', 'pnpm test'],
+  ['M2 Java Host Contract Tests', 'pnpm test:java'],
   ['Event Replay Determinism', 'pnpm debug:replay -- tests/fixtures/capture-duplicate.jsonl'],
   ['Production Build', 'pnpm build']
 ];

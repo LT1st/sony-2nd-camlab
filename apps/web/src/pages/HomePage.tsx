@@ -130,7 +130,7 @@ export const HomePage: React.FC = () => {
             <div className="flex items-center justify-between text-xs text-zinc-400 border-t border-zinc-800 pt-2.5">
               <span>已存胶卷: {rolls.length} 卷</span>
               <span>已导出作品: {exportsList.length} 件</span>
-              <span>离线样片池: 16 张 (含 CC0 ARW 阶段)</span>
+              <span>离线样片池: 18 张 (含 3 组 CC0 ARW 阶段)</span>
             </div>
           </div>
         </SonyCameraChassis>

@@ -1,0 +1,9 @@
+Asset ID: sample-018
+Title: Sony A7 II · CC0 14-bit ColorChecker Passport D65 ARW
+Author: raw.pixls.us #967 Contributor
+License: CC0-1.0 (Creative Commons Zero v1.0 Universal)
+License URL: https://creativecommons.org/publicdomain/zero/1.0/
+Source URL: https://raw.pixls.us/
+SHA256: fd535ca774eb6066beae099b864cdb261478bd5c29f591f4cf53b6aa062310e8
+Redistribution Allowed: true
+EXIF Privacy Audit: Passed (No GPS / No facial biometric PII)

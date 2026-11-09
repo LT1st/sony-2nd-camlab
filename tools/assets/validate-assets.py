@@ -85,27 +85,31 @@ def main() -> int:
         print(f"ERROR: Expected at least 3 ghost pairs, found {len(ghost_pairs)}", file=sys.stderr)
         return 1
 
-    # Check M1 precomputed RAW directory
-    raw_dir = ROOT / "assets" / "generated" / "sample-001"
-    pipeline_path = raw_dir / "pipeline.json"
-    meta_path = raw_dir / "original.meta.json"
-    if not pipeline_path.exists() or not meta_path.exists():
-        print("ERROR: Missing M1 precomputed RAW metadata in assets/generated/sample-001", file=sys.stderr)
-        return 1
+    # Check all M1 precomputed RAW directories
+    raw_assets = [a for a in assets if a.get("pipelineMode") == "RAW_PIPELINE_PRECOMPUTED"]
+    total_stages = 0
+    for raw_asset in raw_assets:
+        raw_dir = ROOT / "assets" / "generated" / raw_asset["id"]
+        pipeline_path = raw_dir / "pipeline.json"
+        meta_path = raw_dir / "original.meta.json"
+        if not pipeline_path.exists() or not meta_path.exists():
+            print(f"ERROR: Missing M1 precomputed RAW metadata in {raw_dir}", file=sys.stderr)
+            return 1
 
-    pipeline = json.loads(pipeline_path.read_text(encoding="utf-8"))
-    for stage in pipeline.get("stages", []):
-        sf = raw_dir / stage["file"]
-        if not sf.exists():
-            print(f"ERROR: Missing RAW stage file {sf}", file=sys.stderr)
-            return 1
-        if sha256_file(sf) != stage["sha256"]:
-            print(f"ERROR: SHA256 mismatch on RAW stage file {sf}", file=sys.stderr)
-            return 1
+        pipeline = json.loads(pipeline_path.read_text(encoding="utf-8"))
+        for stage in pipeline.get("stages", []):
+            sf = raw_dir / stage["file"]
+            if not sf.exists():
+                print(f"ERROR: Missing RAW stage file {sf}", file=sys.stderr)
+                return 1
+            if sha256_file(sf) != stage["sha256"]:
+                print(f"ERROR: SHA256 mismatch on RAW stage file {sf}", file=sys.stderr)
+                return 1
+            total_stages += 1
 
     print(
         f"OK: Validated {len(assets)} licensed assets, {len(ghost_pairs)} Ghost pairs, "
-        f"and {len(pipeline.get('stages', []))} M1 RAW educational stage files."
+        f"{len(raw_assets)} M1 RAW datasets ({total_stages} stage files)."
     )
     return 0
 

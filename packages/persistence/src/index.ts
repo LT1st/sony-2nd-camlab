@@ -1,4 +1,8 @@
-import type { StoragePort, StorageStats } from '@camera-lab/camera-port';
+import type {
+  StorageBackupSnapshot,
+  StoragePort,
+  StorageStats
+} from '@camera-lab/camera-port';
 import {
   type CaptureResult,
   CaptureResultSchema,
@@ -174,6 +178,70 @@ export class DexieStorageAdapter implements StoragePort {
       exportsCount: exportsList.length,
       ghostSessionsCount: ghostSessions.length,
       estimatedBytes: jsonSize
+    };
+  }
+
+  async exportBackup(): Promise<StorageBackupSnapshot> {
+    const [rolls, captures, ghostSessions, allAssets] = await Promise.all([
+      this.listRolls(),
+      this.db.captures.toArray(),
+      this.listGhostSessions(),
+      this.listAssets()
+    ]);
+
+    return {
+      schemaVersion: '2.0.0',
+      exportedAt: new Date().toISOString(),
+      rolls,
+      captures: captures.map((c) => CaptureResultSchema.parse(c)),
+      ghostSessions,
+      userAssets: allAssets.filter((a) => a.origin === 'USER_IMPORT')
+    };
+  }
+
+  async importBackup(snapshot: StorageBackupSnapshot): Promise<{
+    rollsImported: number;
+    capturesImported: number;
+    ghostSessionsImported: number;
+  }> {
+    let rollsImported = 0;
+    let capturesImported = 0;
+    let ghostSessionsImported = 0;
+
+    for (const rawRoll of snapshot.rolls ?? []) {
+      const normalized = {
+        ...rawRoll,
+        preset: rawRoll.preset ?? 'CLASSIC_COLOR',
+        strictMode:
+          typeof rawRoll.strictMode === 'boolean' ? rawRoll.strictMode : true,
+        version: typeof rawRoll.version === 'number' ? rawRoll.version : 1
+      };
+      const parsed = FilmRollSchema.parse(normalized);
+      await this.db.rolls.put(parsed);
+      rollsImported += 1;
+    }
+
+    for (const rawCap of snapshot.captures ?? []) {
+      const parsed = CaptureResultSchema.parse(rawCap);
+      await this.db.captures.put(parsed);
+      capturesImported += 1;
+    }
+
+    for (const rawGhost of snapshot.ghostSessions ?? []) {
+      const parsed = GhostSessionSchema.parse(rawGhost);
+      await this.db.ghostSessions.put(parsed);
+      ghostSessionsImported += 1;
+    }
+
+    for (const rawAsset of snapshot.userAssets ?? []) {
+      const parsed = ImageAssetSchema.parse(rawAsset);
+      await this.db.assets.put(parsed);
+    }
+
+    return {
+      rollsImported,
+      capturesImported,
+      ghostSessionsImported
     };
   }
 

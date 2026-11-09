@@ -16,6 +16,15 @@ export interface StorageStats {
   estimatedBytes: number;
 }
 
+export interface StorageBackupSnapshot {
+  schemaVersion: '2.0.0';
+  exportedAt: string;
+  rolls: FilmRoll[];
+  captures: CaptureResult[];
+  ghostSessions: GhostSession[];
+  userAssets: ImageAsset[];
+}
+
 export interface StoragePort {
   saveRoll(roll: FilmRoll): Promise<void>;
   getRoll(id: string): Promise<FilmRoll | null>;
@@ -31,5 +40,11 @@ export interface StoragePort {
   saveExport(record: ExportRecord): Promise<void>;
   listExports(): Promise<ExportRecord[]>;
   getStats(): Promise<StorageStats>;
+  exportBackup(): Promise<StorageBackupSnapshot>;
+  importBackup(snapshot: StorageBackupSnapshot): Promise<{
+    rollsImported: number;
+    capturesImported: number;
+    ghostSessionsImported: number;
+  }>;
   clearAll(): Promise<void>;
 }

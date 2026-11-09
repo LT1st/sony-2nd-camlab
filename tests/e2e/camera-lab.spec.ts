@@ -133,6 +133,22 @@ test.describe('Camera Lab · AC-01 through AC-12 Full E2E Acceptance Suite', () 
     await expect(page.getByTestId('raw-audit-panel')).toContainText(
       'f067629e2b36706e8173e37f3e6e903b4501d97f51ce7ceb43e9d71da929aa54'
     );
+
+    // Switch to 2nd and 3rd precomputed RAW datasets (sample-017 12-bit ILCE-7RM2 & sample-018 ILCE-7M2 ColorChecker)
+    await page.getByTestId('raw-sample-btn-sample-017').click();
+    await expect(page.getByTestId('raw-audit-panel')).toContainText(
+      'a606ebf1dcc6704f03f2966326c60a87dd6bdb3704464b3897c10349a10d3a19'
+    );
+    await page.getByTestId('raw-sample-btn-sample-018').click();
+    await expect(page.getByTestId('raw-audit-panel')).toContainText(
+      'ILCE-7M2'
+    );
+
+    // Export 7-stage comparison sheet
+    await page.getByTestId('btn-darkroom-export-stage-sheet').click();
+    await expect(page.getByTestId('darkroom-export-banner')).toContainText(
+      '已导出 7 阶段显影对比拼图'
+    );
   });
 
   test('AC-06, AC-08, AC-09: Ghost Viewfinder persistence across reload, /debug JSONL replay idempotency, and diagnostics ZIP export', async ({
@@ -159,6 +175,12 @@ test.describe('Camera Lab · AC-01 through AC-12 Full E2E Acceptance Suite', () 
     await expect(page.getByTestId('ghost-export-banner')).toContainText(
       '已导出时光重影图像'
     );
+
+    // Verify NCC auto-alignment suggestion and pixel-level Difference mode
+    await page.getByTestId('btn-ghost-ncc-suggest').click();
+    await expect(page.getByTestId('ghost-ncc-banner')).toBeVisible();
+    await page.getByTestId('ghost-mode-difference').click();
+    await expect(page.getByTestId('ghost-difference-canvas')).toBeVisible();
 
     // Navigate to /debug and verify all 6 panels, JSONL replay (AC-08), and ZIP export
     await page.getByTestId('nav-debug').click();

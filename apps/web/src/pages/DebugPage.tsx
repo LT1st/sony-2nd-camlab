@@ -66,7 +66,9 @@ export const DebugPage: React.FC = () => {
     events,
     updateFaultConfig,
     resetFaultConfig,
-    applyReplayJsonlToStore
+    applyReplayJsonlToStore,
+    exportBackupJson,
+    importBackupJson
   } = useCameraLab();
 
   const lastExportLatencyMs = useUiStore((s) => s.lastExportLatencyMs);
@@ -90,6 +92,7 @@ export const DebugPage: React.FC = () => {
     url: string;
     files: string[];
   } | null>(null);
+  const [backupBanner, setBackupBanner] = useState<string | null>(null);
   const [fpsEstimate, setFpsEstimate] = useState<number>(60);
 
   useEffect(() => {
@@ -312,7 +315,7 @@ export const DebugPage: React.FC = () => {
                 {assets.filter((a) => a.origin === 'REMOTE_LICENSED').length} 张 |
                 USER_IMPORT:{' '}
                 {assets.filter((a) => a.origin === 'USER_IMPORT').length} 张 |
-                M1 RAW 预计算样片: sample-001 (Sony ILCE-7RM2 CC0 ARW)
+                M1 RAW 预计算样片: sample-001, sample-017, sample-018
               </div>
               <div className="text-zinc-400">
                 liveView={capabilities?.liveView} | captureJPEG=
@@ -685,14 +688,66 @@ export const DebugPage: React.FC = () => {
               </span>
             </label>
 
-            <button
-              type="button"
-              onClick={() => void handleExportDiagnosticsZip()}
-              data-testid="btn-export-diagnostics-zip"
-              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition"
-            >
-              📦 生成并下载诊断 ZIP 包 (Export Diagnostics Bundle)
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void handleExportDiagnosticsZip()}
+                data-testid="btn-export-diagnostics-zip"
+                className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition"
+              >
+                📦 生成并下载诊断 ZIP 包 (Export Diagnostics Bundle)
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  const jsonStr = await exportBackupJson();
+                  const blob = new Blob([jsonStr], {
+                    type: 'application/json'
+                  });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'camera-lab-backup-v2.json';
+                  a.click();
+                  setBackupBanner(
+                    `已生成全量状态备份 JSON (${jsonStr.length} bytes)`
+                  );
+                }}
+                data-testid="btn-export-backup-json"
+                className="px-3.5 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs border border-zinc-700"
+              >
+                💾 导出 IndexedDB 备份 JSON
+              </button>
+
+              <label className="cursor-pointer px-3.5 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-emerald-300 text-xs border border-zinc-700">
+                ⬆ 导入备份 JSON 恢复
+                <input
+                  type="file"
+                  accept="application/json"
+                  className="hidden"
+                  data-testid="input-import-backup-json"
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    const txt = await f.text();
+                    const res = await importBackupJson(txt);
+                    setBackupBanner(
+                      `备份恢复成功：${res.rollsImported} 卷胶卷、${res.capturesImported} 张拍摄记录、${res.ghostSessionsImported} 个重影会话`
+                    );
+                  }}
+                />
+              </label>
+            </div>
+
+            {backupBanner ? (
+              <div
+                className="p-2.5 rounded-xl bg-zinc-950 border border-emerald-700 text-emerald-300"
+                data-testid="backup-status-banner"
+              >
+                ✓ {backupBanner}
+              </div>
+            ) : null}
 
             {zipExportInfo ? (
               <div

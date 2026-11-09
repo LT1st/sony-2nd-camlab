@@ -106,6 +106,59 @@ describe('Adapters, Fault Injection, IndexedDB Persistence & Diagnostics ZIP', (
 
     const stats = await store.getStats();
     expect(stats.rollsCount).toBe(1);
+
+    // Export full backup snapshot and import into a second database instance
+    const backup = await store.exportBackup();
+    expect(backup.schemaVersion).toBe('2.0.0');
+    expect(backup.rolls).toHaveLength(1);
+
+    const store2 = new DexieStorageAdapter(`TestDb-Restore-${Date.now()}`);
+    const restoreRes = await store2.importBackup(backup);
+    expect(restoreRes.rollsImported).toBe(1);
+    const restoredRoll = await store2.getRoll('roll-idb-1');
+    expect(restoredRoll?.name).toBe('IDB Persistence Roll');
+  });
+
+  it('enforces PoolExhaustionStrategy PAUSE when sample pool is exhausted', async () => {
+    const faultInjector = new FaultInjector();
+    const media = new MockMediaAdapter({
+      initialAssets: sampleAssets.slice(0, 2),
+      faultInjector
+    });
+    const camera = new MockCameraAdapter({
+      mediaPort: media,
+      faultInjector,
+      exhaustionStrategy: 'PAUSE'
+    });
+
+    await camera.capturePhoto({
+      captureId: 'cap-p1',
+      rollId: 'roll-pause',
+      frameIndex: 1
+    });
+    await camera.capturePhoto({
+      captureId: 'cap-p2',
+      rollId: 'roll-pause',
+      frameIndex: 2
+    });
+
+    // 3rd capture exceeds 2-item pool under PAUSE strategy
+    await expect(
+      camera.capturePhoto({
+        captureId: 'cap-p3',
+        rollId: 'roll-pause',
+        frameIndex: 3
+      })
+    ).rejects.toThrowError(/PAUSE/);
+
+    // Switching to CYCLE immediately allows continuing
+    camera.setExhaustionStrategy('CYCLE');
+    const c3 = await camera.capturePhoto({
+      captureId: 'cap-p3-cycle',
+      rollId: 'roll-pause',
+      frameIndex: 3
+    });
+    expect(c3.frameIndex).toBe(3);
   });
 
   it('exports a sanitized ZIP diagnostics bundle omitting private image data by default', async () => {

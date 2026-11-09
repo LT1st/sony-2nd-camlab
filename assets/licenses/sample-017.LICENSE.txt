@@ -1,0 +1,9 @@
+Asset ID: sample-017
+Title: Sony A7R II · CC0 12-bit Compressed ARW Reference Scene
+Author: Kelvie Wong (raw.pixls.us #1310)
+License: CC0-1.0 (Creative Commons Zero v1.0 Universal)
+License URL: https://creativecommons.org/publicdomain/zero/1.0/
+Source URL: https://raw.pixls.us/
+SHA256: 40128d8eb14ca42fd459e67c9d7b3bda375ae10e1b5eb31b9dce7d98a748824e
+Redistribution Allowed: true
+EXIF Privacy Audit: Passed (No GPS / No facial biometric PII)

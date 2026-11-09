@@ -40,6 +40,9 @@ jobs:
       - name: Run unit & integration tests
         run: pnpm test
 
+      - name: Run M2 Java host contract tests
+        run: pnpm test:java
+
       - name: Run JSONL Replay verification
         run: pnpm debug:replay -- tests/fixtures/capture-duplicate.jsonl
 

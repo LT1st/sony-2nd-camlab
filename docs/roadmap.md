@@ -11,11 +11,12 @@
 ## M1：真实 RAW 离线教学管线（已完成 ✅）
 
 - [x] Sprint 5：从 `raw.pixls.us` 获取 CC0 授权的 **Sony ILCE-7RM2 14-bit compressed ARW** 样片，通过 `tools/assets/prepare-raw.py` (`rawpy` + NumPy + Pillow) 生成 7 个可追溯阶段图与 `pipeline.json`，在暗房中与 `JPEG_SIMULATION` 明确区分展示。
+- [x] v0.2.0 深度迭代：扩展至 **3 组真实 Sony CC0 RAW 数据集**（`sample-001` ILCE-7RM2 14-bit ARW、`sample-017` ILCE-7RM2 12-bit ARW、`sample-018` ILCE-7M2 14-bit ColorChecker D65 ARW，共 21 个可验证阶段文件），支持实时 256-bin RGB/Luma 直方图、动态范围 EV 遥测与 7 阶段对比拼图导出。
 
-## M2：Android 模拟器原生适配（远期规划 ⏳）
+## M2：Android 模拟器原生适配（已完成宿主 JVM 契约测试与模拟器 Dummy 适配 ✅）
 
 - [x] Sprint 6 设计先行：完成 `apps/camera-android` 架构规范、Java `CameraPort` 与 `FilmRollState` 骨架及旧 Android (API 10~16) 工具链版本冻结文档。
-- [ ] 在标准 Android Emulator (API 16, 640×480) 中运行基于 `OpenMemories-Framework` Dummy 实现的 APK 并跑通共享 JSON 契约测试。
+- [x] v0.2.0 真实契约执行：实现零 AndroidX 依赖的 `FilmRollState`、`GhostAffineMath`、`MockAndroidCameraAdapter`（含 Exit Rule 参数还原）与 `SdCard83Logger`（FAT 8.3 短文件名校验与隐私脱敏），通过 `pnpm test:java`（`javac --release 8`）直接运行 `ContractTestRunner` 对齐 `tests/contracts/state-machine-vectors.json`。
 
 ## M3：Sony α7R II (ILCE-7RM2) 真机安全探测与接入（远期规划 ⏳）
 

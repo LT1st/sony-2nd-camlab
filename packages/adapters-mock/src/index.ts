@@ -366,6 +366,12 @@ export class MockCameraAdapter implements CameraPort {
         '样片池为空，无法生成模拟取景画面。'
       );
     }
+    if (this.exhaustionStrategy === 'PAUSE' && this.queueIndex >= assets.length) {
+      throw new CameraPortError(
+        'ASSET_MISSING',
+        '预置样片队列已耗尽（当前策略：PAUSE）。请切换为循环模式（CYCLE）或导入新样片。'
+      );
+    }
     const safeIndex =
       ((this.queueIndex % assets.length) + assets.length) % assets.length;
     const asset = assets[safeIndex]!;
@@ -532,7 +538,11 @@ export class MockCameraAdapter implements CameraPort {
       // Advance sample queue so each shutter consumes the next sample in pool
       const assets = await this.mediaPort.listAssets();
       if (assets.length > 0) {
-        this.queueIndex = (this.queueIndex + 1) % assets.length;
+        if (this.exhaustionStrategy === 'PAUSE') {
+          this.queueIndex = Math.min(assets.length, this.queueIndex + 1);
+        } else {
+          this.queueIndex = (this.queueIndex + 1) % assets.length;
+        }
       }
 
       const completedEvent: CameraEvent = {

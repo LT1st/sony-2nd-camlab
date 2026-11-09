@@ -1,5 +1,9 @@
 import type { DarkroomStageId, FilmRecipe } from '@camera-lab/contracts';
-import { processStagePixelBuffer } from '@camera-lab/image-core';
+import {
+  computeHistogram,
+  type ImageHistogram,
+  processStagePixelBuffer
+} from '@camera-lab/image-core';
 
 export interface DarkroomWorkerRequest {
   jobId: string;
@@ -18,6 +22,7 @@ export interface DarkroomWorkerResponse {
   height: number;
   buffer: ArrayBuffer;
   durationMs: number;
+  histogram: ImageHistogram;
 }
 
 self.onmessage = (evt: MessageEvent<DarkroomWorkerRequest>) => {
@@ -33,6 +38,7 @@ self.onmessage = (evt: MessageEvent<DarkroomWorkerRequest>) => {
     req.stage,
     req.recipe
   );
+  const histogram = computeHistogram(processed);
   const durationMs = Math.max(1, Math.round(performance.now() - start));
   const outBuffer = processed.data.buffer;
 
@@ -42,7 +48,8 @@ self.onmessage = (evt: MessageEvent<DarkroomWorkerRequest>) => {
     width: processed.width,
     height: processed.height,
     buffer: outBuffer,
-    durationMs
+    durationMs,
+    histogram
   };
 
   (self as unknown as Worker).postMessage(response, [outBuffer]);

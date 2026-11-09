@@ -21,7 +21,9 @@ export const CameraPage: React.FC = () => {
     shutterCapture,
     attemptReviewActiveRoll,
     sealActiveRoll,
-    resetFaultConfig
+    resetFaultConfig,
+    poolStrategy,
+    changePoolStrategy
   } = useCameraLab();
 
   const [newRollName, setNewRollName] = useState('Ilford HP5 Plus · Tokyo Street');
@@ -286,13 +288,42 @@ export const CameraPage: React.FC = () => {
             </div>
 
             {/* Sample Selector Strip */}
-            <div className="pt-2 border-t border-zinc-800">
-              <div className="flex items-center justify-between text-xs text-zinc-400 mb-2">
-                <span>取景器模拟场景队列（每次快门自动推进下一张，避免重复画面）</span>
-                <span>当前: {previewFrame?.assetId ?? 'N/A'}</span>
+            <div className="pt-2 border-t border-zinc-800 space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-400">
+                <span>
+                  取景器模拟场景队列（共 {assets.length} 张 · 当前:{' '}
+                  {previewFrame?.assetId ?? 'N/A'}）
+                </span>
+                <div className="flex items-center gap-1.5 font-mono">
+                  <span>队列耗尽策略:</span>
+                  <button
+                    type="button"
+                    onClick={() => void changePoolStrategy('CYCLE')}
+                    data-testid="btn-pool-strategy-cycle"
+                    className={`px-2 py-0.5 rounded border ${
+                      poolStrategy === 'CYCLE'
+                        ? 'bg-amber-500 text-black font-bold border-amber-400'
+                        : 'bg-zinc-950 border-zinc-800 text-zinc-400'
+                    }`}
+                  >
+                    CYCLE 循环
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void changePoolStrategy('PAUSE')}
+                    data-testid="btn-pool-strategy-pause"
+                    className={`px-2 py-0.5 rounded border ${
+                      poolStrategy === 'PAUSE'
+                        ? 'bg-amber-500 text-black font-bold border-amber-400'
+                        : 'bg-zinc-950 border-zinc-800 text-zinc-400'
+                    }`}
+                  >
+                    PAUSE 暂停提示
+                  </button>
+                </div>
               </div>
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-                {assets.slice(0, 10).map((asset) => (
+                {assets.map((asset) => (
                   <button
                     key={asset.id}
                     type="button"

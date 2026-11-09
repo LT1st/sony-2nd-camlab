@@ -109,6 +109,8 @@ def process_raw_file(
     sample_id: str,
     source_url: str,
     download_url: str,
+    camera_model: str = "ILCE-7RM2",
+    raw_format: str = "Sony 14-bit compressed ARW (3:2)",
     expected_sha256: str | None = None,
     max_edge: int = 960,
 ) -> dict:
@@ -195,8 +197,8 @@ def process_raw_file(
     meta = {
         "sampleId": sample_id,
         "cameraMake": "Sony",
-        "cameraModel": "ILCE-7RM2",
-        "rawFormat": "Sony 14-bit compressed ARW (3:2)",
+        "cameraModel": camera_model,
+        "rawFormat": raw_format,
         "sourceRepository": "https://raw.pixls.us/",
         "sourceUrl": source_url,
         "downloadUrl": download_url,
@@ -213,13 +215,13 @@ def process_raw_file(
 
     pipeline = {
         "generator": "tools/assets/prepare-raw.py",
-        "generatorVersion": "1.0.0",
+        "generatorVersion": "1.1.0",
         "rawpyVersion": rawpy.__version__,
         "numpyVersion": np.__version__,
         "pillowVersion": Image.__version__,
         "mode": "RAW_PIPELINE_PRECOMPUTED",
         "honestyDisclosure": (
-            "Generated offline from an authentic CC0 Sony ILCE-7RM2 14-bit ARW file via rawpy/LibRaw and NumPy. "
+            f"Generated offline from an authentic CC0 Sony {camera_model} ({raw_format}) file via rawpy/LibRaw and NumPy. "
             "Demonstrates Camera Lab's open RAW educational pipeline; does NOT claim to be Sony BIONZ X proprietary ISP output."
         ),
         "sensorParameters": {
@@ -290,6 +292,8 @@ def main() -> None:
         default="https://raw.pixls.us/getfile.php/1312/nice/Sony%20-%20ILCE-7RM2%20-%2014bit%2014bit%20compressed%20(3:2).ARW",
         help="Canonical raw.pixls.us download URL",
     )
+    parser.add_argument("--camera-model", default="ILCE-7RM2", help="Camera model string")
+    parser.add_argument("--raw-format", default="Sony 14-bit compressed ARW (3:2)", help="RAW format description")
     parser.add_argument("--sha256", default=None, help="Optional expected SHA256 of the RAW file")
     args = parser.parse_args()
 
@@ -299,6 +303,8 @@ def main() -> None:
         sample_id=args.id,
         source_url=args.source_url,
         download_url=args.download_url,
+        camera_model=args.camera_model,
+        raw_format=args.raw_format,
         expected_sha256=args.sha256,
     )
     print(f"Prepared RAW educational stages for {args.id} -> {args.out}")

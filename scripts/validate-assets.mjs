@@ -99,49 +99,66 @@ function main() {
     process.exit(1);
   }
 
-  const rawPipelinePath = path.join(
-    rootDir,
-    'assets',
-    'generated',
-    'sample-001',
-    'pipeline.json'
-  );
-  if (!fs.existsSync(rawPipelinePath)) {
-    console.error('ERROR: Missing assets/generated/sample-001/pipeline.json');
+  const rawAssets = assets.filter((a) => a.pipelineMode === 'RAW_PIPELINE_PRECOMPUTED');
+  if (rawAssets.length < 1) {
+    console.error('ERROR: Expected at least 1 RAW_PIPELINE_PRECOMPUTED asset');
     process.exit(1);
   }
-  const rawPipeline = JSON.parse(fs.readFileSync(rawPipelinePath, 'utf-8'));
-  for (const stage of rawPipeline.stages ?? []) {
-    const stageFile = path.join(
+
+  let totalRawStagesVerified = 0;
+  for (const rawAsset of rawAssets) {
+    const rawPipelinePath = path.join(
       rootDir,
       'assets',
       'generated',
-      'sample-001',
-      stage.file
+      rawAsset.id,
+      'pipeline.json'
     );
-    const pubStageFile = path.join(
+    const rawMetaPath = path.join(
       rootDir,
-      'apps',
-      'web',
-      'public',
       'assets',
       'generated',
-      'sample-001',
-      stage.file
+      rawAsset.id,
+      'original.meta.json'
     );
-    if (!fs.existsSync(stageFile) || !fs.existsSync(pubStageFile)) {
-      console.error(`ERROR: Missing RAW stage file ${stage.file}`);
+    if (!fs.existsSync(rawPipelinePath) || !fs.existsSync(rawMetaPath)) {
+      console.error(`ERROR: Missing pipeline.json or original.meta.json for ${rawAsset.id}`);
       process.exit(1);
     }
-    const stageHash = sha256File(stageFile);
-    if (stageHash !== stage.sha256) {
-      console.error(`ERROR: SHA256 mismatch for RAW stage ${stage.file}`);
-      process.exit(1);
+    const rawPipeline = JSON.parse(fs.readFileSync(rawPipelinePath, 'utf-8'));
+    for (const stage of rawPipeline.stages ?? []) {
+      const stageFile = path.join(
+        rootDir,
+        'assets',
+        'generated',
+        rawAsset.id,
+        stage.file
+      );
+      const pubStageFile = path.join(
+        rootDir,
+        'apps',
+        'web',
+        'public',
+        'assets',
+        'generated',
+        rawAsset.id,
+        stage.file
+      );
+      if (!fs.existsSync(stageFile) || !fs.existsSync(pubStageFile)) {
+        console.error(`ERROR: Missing RAW stage file ${rawAsset.id}/${stage.file}`);
+        process.exit(1);
+      }
+      const stageHash = sha256File(stageFile);
+      if (stageHash !== stage.sha256) {
+        console.error(`ERROR: SHA256 mismatch for RAW stage ${rawAsset.id}/${stage.file}`);
+        process.exit(1);
+      }
+      totalRawStagesVerified += 1;
     }
   }
 
   console.log(
-    `[assets:check] PASS — ${assets.length} licensed samples, ${ghostPairs.size} Ghost pairs, and ${rawPipeline.stages.length} M1 RAW stages verified.`
+    `[assets:check] PASS — ${assets.length} licensed samples, ${ghostPairs.size} Ghost pairs, ${rawAssets.length} M1 RAW datasets (${totalRawStagesVerified} stage files) verified.`
   );
 }
 

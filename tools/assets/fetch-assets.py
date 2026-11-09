@@ -468,6 +468,30 @@ SAMPLE_SPECS = [
             "window_dark": (38, 46, 56),
         },
     },
+    {
+        "id": "sample-017",
+        "title": "Sony A7R II · CC0 12-bit Compressed ARW Reference Scene",
+        "category": "raw-reference",
+        "cameraModel": "ILCE-7RM2",
+        "pipelineMode": "RAW_PIPELINE_PRECOMPUTED",
+        "rawStagesDir": "/assets/generated/sample-017",
+        "sourceUrl": "https://raw.pixls.us/",
+        "downloadUrl": "https://raw.pixls.us/getfile.php/1310/nice/Sony%20-%20ILCE-7RM2%20-%2012bit%2012bit%20compressed%20(3:2).ARW",
+        "author": "Kelvie Wong (raw.pixls.us #1310)",
+        "attribution": "CC0 1.0 Public Domain contribution via raw.pixls.us (Sony ILCE-7RM2 12-bit compressed ARW)",
+    },
+    {
+        "id": "sample-018",
+        "title": "Sony A7 II · CC0 14-bit ColorChecker Passport D65 ARW",
+        "category": "raw-reference",
+        "cameraModel": "ILCE-7M2",
+        "pipelineMode": "RAW_PIPELINE_PRECOMPUTED",
+        "rawStagesDir": "/assets/generated/sample-018",
+        "sourceUrl": "https://raw.pixls.us/",
+        "downloadUrl": "https://raw.pixls.us/getfile.php/967/nice/Sony%20-%20ILCE-7M2%20-%2014bit%2014bit%20compressed%20(3:2).arw",
+        "author": "raw.pixls.us #967 Contributor",
+        "attribution": "CC0 1.0 Public Domain contribution via raw.pixls.us (Sony ILCE-7M2 14-bit compressed ColorChecker D65 ARW)",
+    },
 ]
 
 
@@ -484,7 +508,10 @@ def build_all_samples() -> None:
         dest_path = SAMPLES_DIR / filename
         pub_path = PUBLIC_SAMPLES_DIR / filename
 
-        if sample_id == "sample-001" and GENERATED_RAW_FINAL.exists():
+        raw_final_candidate = ROOT / "assets" / "generated" / sample_id / "final.jpg"
+        if spec.get("pipelineMode") == "RAW_PIPELINE_PRECOMPUTED" and raw_final_candidate.exists():
+            shutil.copyfile(raw_final_candidate, dest_path)
+        elif sample_id == "sample-001" and GENERATED_RAW_FINAL.exists():
             shutil.copyfile(GENERATED_RAW_FINAL, dest_path)
         else:
             img = draw_architectural_scene(

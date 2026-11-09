@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   DEFAULT_FILM_RECIPE,
   type DarkroomStageId,
@@ -13,22 +13,32 @@ import {
   createRecipeForPreset
 } from '@camera-lab/domain';
 import {
+  computeHistogram,
+  type ImageHistogram
+} from '@camera-lab/image-core';
+import {
   darkroomProcessor,
   diagnostics,
+  rawDemoCatalog,
   rawDemoMetadata
 } from '../adapters/runtime.js';
 import { useCameraLab } from '../app/CameraLabProvider.js';
 import { useUiStore } from '../stores/uiStore.js';
 
-const RAW_STAGE_FILE_MAP: Record<DarkroomStageId, string> = {
-  RAW_SENSOR: '/assets/generated/sample-001/stage-00-mosaic.webp',
-  BLACK_LEVEL: '/assets/generated/sample-001/stage-01-black-level.webp',
-  DEMOSAIC: '/assets/generated/sample-001/stage-02-demosaic.webp',
-  WHITE_BALANCE: '/assets/generated/sample-001/stage-03-white-balance.webp',
-  TONE: '/assets/generated/sample-001/stage-04-tone.webp',
-  FILM_LOOK: '/assets/generated/sample-001/stage-05-film.webp',
-  JPEG_EXPORT: '/assets/generated/sample-001/final.jpg'
+const RAW_STAGE_FILENAME: Record<DarkroomStageId, string> = {
+  RAW_SENSOR: 'stage-00-mosaic.webp',
+  BLACK_LEVEL: 'stage-01-black-level.webp',
+  DEMOSAIC: 'stage-02-demosaic.webp',
+  WHITE_BALANCE: 'stage-03-white-balance.webp',
+  TONE: 'stage-04-tone.webp',
+  FILM_LOOK: 'stage-05-film.webp',
+  JPEG_EXPORT: 'final.jpg'
 };
+
+function getRawStageUrl(assetId: string, stage: DarkroomStageId): string {
+  const safeId = rawDemoCatalog[assetId] ? assetId : 'sample-001';
+  return `/assets/generated/${safeId}/${RAW_STAGE_FILENAME[stage]}`;
+}
 
 export const DarkroomPage: React.FC = () => {
   const { assets, saveExportDerivative } = useCameraLab();
@@ -50,6 +60,7 @@ export const DarkroomPage: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastDurationMs, setLastDurationMs] = useState(14);
   const [activeJobId, setActiveJobId] = useState('job-init');
+  const [histogram, setHistogram] = useState<ImageHistogram | null>(null);
   const [exportBanner, setExportBanner] = useState<string | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -58,10 +69,39 @@ export const DarkroomPage: React.FC = () => {
   const currentAsset =
     assets.find((a) => a.id === selectedAssetId) ?? assets[0]!;
 
+  const activeRawSampleId = rawDemoCatalog[currentAsset.id]
+    ? currentAsset.id
+    : 'sample-001';
+  const activeRawMeta = rawDemoCatalog[activeRawSampleId] ?? rawDemoMetadata;
+
   const stageInfo =
     DARKROOM_STAGES.find((s) => s.id === currentStage) ?? DARKROOM_STAGES[0]!;
 
-  // Load base ImageData when selectedAssetId changes
+  const histogramSvgPoints = useMemo(() => {
+    if (!histogram) return null;
+    const maxVal = Math.max(
+      1,
+      ...histogram.luma,
+      ...histogram.r,
+      ...histogram.g,
+      ...histogram.b
+    );
+    const buildPolyline = (bins: number[]) =>
+      bins
+        .map((val, idx) => {
+          const x = ((idx / 255) * 256).toFixed(1);
+          const y = (64 - (val / maxVal) * 60).toFixed(1);
+          return `${x},${y}`;
+        })
+        .join(' ');
+    return {
+      luma: buildPolyline(histogram.luma),
+      r: buildPolyline(histogram.r),
+      g: buildPolyline(histogram.g),
+      b: buildPolyline(histogram.b)
+    };
+  }, [histogram]);
+
   const renderSimulationStage = useCallback(
     async (
       baseData: ImageData,
@@ -81,12 +121,12 @@ export const DarkroomPage: React.FC = () => {
       });
 
       if (res.stale) {
-        // Stale job cancelled by newer photo selection or slider drag
         return;
       }
 
       setIsProcessing(false);
       setLastDurationMs(res.durationMs);
+      setHistogram(res.histogram);
 
       const canvas = canvasRef.current;
       if (canvas) {
@@ -107,17 +147,25 @@ export const DarkroomPage: React.FC = () => {
 
     (async () => {
       try {
+        const targetUrl =
+          pipelineMode === 'RAW_PIPELINE_PRECOMPUTED'
+            ? getRawStageUrl(
+                activeRawSampleId,
+                compareBefore ? 'DEMOSAIC' : currentStage
+              )
+            : currentAsset.url;
+
         const img = await new Promise<HTMLImageElement>((resolve, reject) => {
           const el = new Image();
           el.crossOrigin = 'anonymous';
           el.onload = () => resolve(el);
-          el.onerror = () => reject(new Error(`加载图像失败: ${currentAsset.url}`));
-          el.src = currentAsset.url;
+          el.onerror = () =>
+            reject(new Error(`加载图像失败: ${targetUrl}`));
+          el.src = targetUrl;
         });
 
         if (cancelled) return;
 
-        // Constrain working image longest edge <= 960px (within M0 <= 1600px rule)
         const maxEdge = 720;
         const scale = Math.min(
           1,
@@ -142,9 +190,17 @@ export const DarkroomPage: React.FC = () => {
             recipe,
             currentAsset.id
           );
+        } else {
+          // Compute real histogram from the precomputed RAW stage image
+          setHistogram(
+            computeHistogram({
+              width: imageData.width,
+              height: imageData.height,
+              data: imageData.data
+            })
+          );
         }
       } catch {
-        // Synthetic fallback buffer for headless environments
         const fallbackW = 480;
         const fallbackH = 320;
         const buf = new Uint8ClampedArray(fallbackW * fallbackH * 4);
@@ -163,6 +219,14 @@ export const DarkroomPage: React.FC = () => {
             recipe,
             currentAsset.id
           );
+        } else if (!cancelled) {
+          setHistogram(
+            computeHistogram({
+              width: fallbackW,
+              height: fallbackH,
+              data: buf
+            })
+          );
         }
       }
     })();
@@ -171,6 +235,7 @@ export const DarkroomPage: React.FC = () => {
       cancelled = true;
     };
   }, [
+    activeRawSampleId,
     compareBefore,
     currentAsset.id,
     currentAsset.url,
@@ -180,7 +245,6 @@ export const DarkroomPage: React.FC = () => {
     renderSimulationStage
   ]);
 
-  // Timeline auto-play
   useEffect(() => {
     if (!isPlaying) return;
     const delay = Math.round(700 / speedMultiplier);
@@ -202,7 +266,7 @@ export const DarkroomPage: React.FC = () => {
     let dataUrl = '';
 
     if (pipelineMode === 'RAW_PIPELINE_PRECOMPUTED') {
-      dataUrl = RAW_STAGE_FILE_MAP[currentStage];
+      dataUrl = getRawStageUrl(activeRawSampleId, currentStage);
     } else if (canvasRef.current) {
       dataUrl = canvasRef.current.toDataURL('image/jpeg', recipe.jpegQuality);
     }
@@ -222,7 +286,13 @@ export const DarkroomPage: React.FC = () => {
           pipelineMode === 'JPEG_SIMULATION'
             ? 'SIMULATED_NOT_REAL_RAW'
             : 'PRECOMPUTED_RAWPY_EDUCATIONAL_PIPELINE',
-        recipe
+        recipe,
+        histogramSummary: histogram
+          ? {
+              meanLuma: histogram.meanLuma,
+              dynamicRangeStops: histogram.dynamicRangeStops
+            }
+          : undefined
       }
     });
 
@@ -249,6 +319,113 @@ export const DarkroomPage: React.FC = () => {
     }
   };
 
+  const handleExportStageSheet = async () => {
+    const startMs = performance.now();
+    const cols = 4;
+    const rows = 2;
+    const cellW = 260;
+    const cellH = 200;
+    const sheetCanvas = document.createElement('canvas');
+    sheetCanvas.width = cols * cellW + 32;
+    sheetCanvas.height = rows * cellH + 80;
+    const ctx = sheetCanvas.getContext('2d');
+
+    if (ctx) {
+      ctx.fillStyle = '#09090b';
+      ctx.fillRect(0, 0, sheetCanvas.width, sheetCanvas.height);
+
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = 'bold 15px monospace';
+      ctx.fillText(
+        `DARKROOM 7-STAGE COMPARISON SHEET · ${currentAsset.id} [${pipelineMode}]`,
+        16,
+        30
+      );
+
+      ctx.fillStyle = '#a1a1aa';
+      ctx.font = '11px monospace';
+      ctx.fillText(
+        pipelineMode === 'JPEG_SIMULATION'
+          ? 'Mode: SIMULATED (Canvas/WebWorker RGB pipeline · Not real sensor RAW)'
+          : `Mode: RAW_PIPELINE_PRECOMPUTED (${activeRawMeta.meta.cameraModel} · SHA256 ${activeRawMeta.meta.originalRawSha256.slice(0, 16)}...)`,
+        16,
+        50
+      );
+
+      for (let i = 0; i < DARKROOM_STAGES.length; i++) {
+        const st = DARKROOM_STAGES[i]!;
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const x = 16 + col * cellW;
+        const y = 64 + row * cellH;
+
+        ctx.strokeStyle = '#3f3f46';
+        ctx.strokeRect(x, y, cellW - 12, cellH - 12);
+
+        ctx.fillStyle = '#fbbf24';
+        ctx.font = 'bold 11px monospace';
+        ctx.fillText(`0${st.order} ${st.labelEn}`, x + 8, y + 16);
+
+        if (
+          pipelineMode === 'JPEG_SIMULATION' &&
+          sourceImageDataRef.current
+        ) {
+          const res = await darkroomProcessor.processStage({
+            jobId: `sheet-${currentAsset.id}-${st.id}`,
+            sourceImageData: sourceImageDataRef.current,
+            stage: st.id,
+            recipe
+          });
+          const tmp = document.createElement('canvas');
+          tmp.width = res.imageData.width;
+          tmp.height = res.imageData.height;
+          tmp.getContext('2d')?.putImageData(res.imageData, 0, 0);
+          ctx.drawImage(tmp, x + 8, y + 24, cellW - 28, cellH - 46);
+        } else {
+          try {
+            const stageImg = await new Promise<HTMLImageElement>(
+              (resolve, reject) => {
+                const el = new Image();
+                el.crossOrigin = 'anonymous';
+                el.onload = () => resolve(el);
+                el.onerror = reject;
+                el.src = getRawStageUrl(activeRawSampleId, st.id);
+              }
+            );
+            ctx.drawImage(stageImg, x + 8, y + 24, cellW - 28, cellH - 46);
+          } catch {
+            ctx.fillStyle = '#18181b';
+            ctx.fillRect(x + 8, y + 24, cellW - 28, cellH - 46);
+          }
+        }
+      }
+    }
+
+    const dataUrl = sheetCanvas.toDataURL('image/jpeg', 0.92);
+    const filename = `stage-sheet-${currentAsset.id}-${pipelineMode.toLowerCase()}.jpg`;
+    const record = await saveExportDerivative({
+      sourceAssetId: currentAsset.id,
+      kind: 'DARKROOM_STAGE_SHEET',
+      mode: pipelineMode,
+      mimeType: 'image/jpeg',
+      dataUrl,
+      filename,
+      metadata: {
+        stagesCount: DARKROOM_STAGES.length,
+        mode: pipelineMode,
+        recipe
+      }
+    });
+
+    const elapsed = Math.max(1, Math.round(performance.now() - startMs));
+    setLastExportLatencyMs(elapsed);
+    if (record) {
+      setExportBanner(
+        `已导出 7 阶段显影对比拼图：${record.filename}（耗时 ${elapsed}ms）`
+      );
+    }
+  };
+
   const handleExportRecipeJson = async () => {
     const payload = {
       schemaVersion: '1.0.0',
@@ -259,7 +436,7 @@ export const DarkroomPage: React.FC = () => {
       honestyTag:
         pipelineMode === 'JPEG_SIMULATION'
           ? 'SIMULATED (Canvas/WebWorker RGB approximation)'
-          : 'RAW_PIPELINE_PRECOMPUTED (Offline rawpy/LibRaw Sony ILCE-7RM2 CC0 ARW)',
+          : `RAW_PIPELINE_PRECOMPUTED (Offline rawpy/LibRaw ${activeRawMeta.meta.cameraModel} CC0 ARW)`,
       currentStage,
       recipe
     };
@@ -326,7 +503,9 @@ export const DarkroomPage: React.FC = () => {
             <button
               type="button"
               onClick={() => {
-                setSelectedAssetId('sample-001');
+                if (!rawDemoCatalog[selectedAssetId]) {
+                  setSelectedAssetId('sample-001');
+                }
                 setPipelineMode('RAW_PIPELINE_PRECOMPUTED');
               }}
               data-testid="btn-mode-raw-precomputed"
@@ -515,7 +694,7 @@ export const DarkroomPage: React.FC = () => {
               />
             ) : (
               <img
-                src={RAW_STAGE_FILE_MAP[currentStage]}
+                src={getRawStageUrl(activeRawSampleId, currentStage)}
                 alt={`RAW Stage ${currentStage}`}
                 data-testid="darkroom-raw-stage-image"
                 className="w-full h-full object-contain"
@@ -537,7 +716,7 @@ export const DarkroomPage: React.FC = () => {
             >
               {pipelineMode === 'JPEG_SIMULATION'
                 ? `SIMULATED · ${currentStage}`
-                : `RAW_PIPELINE_PRECOMPUTED · ${currentStage}`}
+                : `RAW_PIPELINE_PRECOMPUTED · ${activeRawMeta.meta.cameraModel} · ${currentStage}`}
             </div>
           </div>
 
@@ -551,13 +730,78 @@ export const DarkroomPage: React.FC = () => {
               : stageInfo.rawPrecomputedDescription}
           </div>
 
+          {/* Real 256-bin RGB & Luminance Histogram Telemetry */}
+          {histogram && histogramSvgPoints ? (
+            <div
+              className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2 font-mono text-xs"
+              data-testid="darkroom-histogram-panel"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                <span className="text-amber-400 font-bold">
+                  REAL-TIME RGB & LUMA HISTOGRAM · 256-Bin 光度直方图
+                </span>
+                <span className="text-zinc-400">
+                  平均亮度:{' '}
+                  <strong
+                    className="text-zinc-200"
+                    data-testid="hist-mean-luma"
+                  >
+                    {histogram.meanLuma}
+                  </strong>{' '}
+                  | 动态范围:{' '}
+                  <strong
+                    className="text-emerald-400"
+                    data-testid="hist-dr-stops"
+                  >
+                    {histogram.dynamicRangeStops} EV
+                  </strong>{' '}
+                  | 暗部死黑: {histogram.shadowClipPercent}% | 高光溢出:{' '}
+                  {histogram.highlightClipPercent}%
+                </span>
+              </div>
+              <svg
+                viewBox="0 0 256 64"
+                className="w-full h-16 bg-black/70 rounded border border-zinc-800"
+                preserveAspectRatio="none"
+              >
+                <polyline
+                  fill="none"
+                  stroke="#ef4444"
+                  strokeWidth="1.2"
+                  strokeOpacity="0.7"
+                  points={histogramSvgPoints.r}
+                />
+                <polyline
+                  fill="none"
+                  stroke="#22c55e"
+                  strokeWidth="1.2"
+                  strokeOpacity="0.7"
+                  points={histogramSvgPoints.g}
+                />
+                <polyline
+                  fill="none"
+                  stroke="#3b82f6"
+                  strokeWidth="1.2"
+                  strokeOpacity="0.7"
+                  points={histogramSvgPoints.b}
+                />
+                <polyline
+                  fill="none"
+                  stroke="#f59e0b"
+                  strokeWidth="1.5"
+                  points={histogramSvgPoints.luma}
+                />
+              </svg>
+            </div>
+          ) : null}
+
           {/* Asset Picker Strip */}
           <div className="pt-2 border-t border-zinc-800">
             <div className="text-xs text-zinc-400 mb-2">
               切换暗房工作底片（切换时自动取消未完成的旧 Worker 任务）：
             </div>
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-              {assets.slice(0, 12).map((a) => (
+              {assets.map((a) => (
                 <button
                   key={a.id}
                   type="button"
@@ -570,6 +814,7 @@ export const DarkroomPage: React.FC = () => {
                   }`}
                 >
                   {a.id}
+                  {a.pipelineMode === 'RAW_PIPELINE_PRECOMPUTED' ? ' [RAW]' : ''}
                 </button>
               ))}
             </div>
@@ -764,40 +1009,69 @@ export const DarkroomPage: React.FC = () => {
               className="bg-zinc-900/80 border border-emerald-800/70 rounded-2xl p-5 space-y-3 font-mono text-xs"
               data-testid="raw-audit-panel"
             >
-              <div className="text-emerald-400 font-bold text-sm">
-                M1 真实 RAW 离线预处理审计清单 (pipeline.json)
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-emerald-400 font-bold text-sm">
+                  M1 真实 RAW 离线预处理审计清单 (pipeline.json)
+                </span>
               </div>
+
+              {/* Multi-RAW Sample Selector */}
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {Object.keys(rawDemoCatalog).map((rawId) => {
+                  const bundle = rawDemoCatalog[rawId]!;
+                  return (
+                    <button
+                      key={rawId}
+                      type="button"
+                      onClick={() => setSelectedAssetId(rawId)}
+                      data-testid={`raw-sample-btn-${rawId}`}
+                      className={`px-2.5 py-1 rounded border text-[11px] transition ${
+                        activeRawSampleId === rawId
+                          ? 'bg-emerald-500 text-black font-bold border-emerald-400'
+                          : 'bg-zinc-950 text-zinc-300 border-zinc-800'
+                      }`}
+                    >
+                      {rawId} · {bundle.meta.cameraModel} (
+                      {bundle.meta.rawFormat.includes('12-bit')
+                        ? '12-bit'
+                        : '14-bit'}
+                      )
+                    </button>
+                  );
+                })}
+              </div>
+
               <p className="text-zinc-300 leading-relaxed">
-                {rawDemoMetadata.pipeline.honestyDisclosure}
+                {activeRawMeta.pipeline.honestyDisclosure}
               </p>
               <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1 text-zinc-300">
                 <div>
-                  机身型号: <strong>{rawDemoMetadata.meta.cameraModel}</strong> (
-                  {rawDemoMetadata.meta.rawFormat})
+                  机身型号: <strong>{activeRawMeta.meta.cameraModel}</strong> (
+                  {activeRawMeta.meta.rawFormat})
                 </div>
                 <div>
-                  许可证: <strong>{rawDemoMetadata.meta.license}</strong> (
-                  {rawDemoMetadata.meta.sourceRepository})
+                  许可证: <strong>{activeRawMeta.meta.license}</strong> (
+                  {activeRawMeta.meta.sourceRepository})
                 </div>
                 <div className="break-all">
                   原始 ARW SHA256:{' '}
                   <span className="text-amber-300">
-                    {rawDemoMetadata.meta.originalRawSha256}
+                    {activeRawMeta.meta.originalRawSha256}
                   </span>
                 </div>
                 <div>
                   传感器黑电平:{' '}
                   {JSON.stringify(
-                    rawDemoMetadata.pipeline.sensorParameters.blackLevelPerChannel
+                    activeRawMeta.pipeline.sensorParameters.blackLevelPerChannel
                   )}
                 </div>
                 <div>
-                  生成器: {rawDemoMetadata.pipeline.generator} (rawpy{' '}
-                  {rawDemoMetadata.pipeline.rawpyVersion})
+                  生成器: {activeRawMeta.pipeline.generator} (rawpy{' '}
+                  {activeRawMeta.pipeline.rawpyVersion})
                 </div>
               </div>
               <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
-                {rawDemoMetadata.pipeline.stages.map((st) => (
+                {activeRawMeta.pipeline.stages.map((st) => (
                   <div
                     key={st.stageId}
                     className="p-2 rounded bg-zinc-950 border border-zinc-800"
@@ -825,6 +1099,14 @@ export const DarkroomPage: React.FC = () => {
                 className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition"
               >
                 ⬇ 导出当前阶段 JPEG
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleExportStageSheet()}
+                data-testid="btn-darkroom-export-stage-sheet"
+                className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition"
+              >
+                ⬇ 导出 7 阶段对比拼图
               </button>
               <button
                 type="button"

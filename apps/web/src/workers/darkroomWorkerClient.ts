@@ -1,6 +1,10 @@
 import type { DarkroomStageId, FilmRecipe } from '@camera-lab/contracts';
 import { MonotonicJobGuard } from '@camera-lab/domain';
-import { processStagePixelBuffer } from '@camera-lab/image-core';
+import {
+  computeHistogram,
+  type ImageHistogram,
+  processStagePixelBuffer
+} from '@camera-lab/image-core';
 import type {
   DarkroomWorkerRequest,
   DarkroomWorkerResponse
@@ -11,6 +15,7 @@ export interface ProcessedStageResult {
   imageData: ImageData;
   durationMs: number;
   stale: boolean;
+  histogram: ImageHistogram;
 }
 
 export class DarkroomProcessorClient {
@@ -98,7 +103,8 @@ export class DarkroomProcessorClient {
             workerResponse.height
           ),
           durationMs: workerResponse.durationMs,
-          stale: !isCurrent
+          stale: !isCurrent,
+          histogram: workerResponse.histogram
         };
       }
 
@@ -113,6 +119,7 @@ export class DarkroomProcessorClient {
         params.stage,
         params.recipe
       );
+      const histogram = computeHistogram(out);
       const durationMs = Math.max(1, Math.round(performance.now() - start));
       this.lastDurationMs = durationMs;
       const isCurrent = this.guard.isCurrent(token, jobId);
@@ -124,7 +131,8 @@ export class DarkroomProcessorClient {
           out.height
         ),
         durationMs,
-        stale: !isCurrent
+        stale: !isCurrent,
+        histogram
       };
     } finally {
       this.queueDepth = Math.max(0, this.queueDepth - 1);

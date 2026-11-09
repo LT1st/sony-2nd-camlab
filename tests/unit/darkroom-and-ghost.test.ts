@@ -12,6 +12,10 @@ import {
 } from '@camera-lab/domain';
 import {
   computeAbsoluteDifferenceBuffer,
+  computeHistogram,
+  estimateTranslationOffsetNcc,
+  normalizeBufferByExifOrientation,
+  parseJpegExifOrientation,
   processStagePixelBuffer
 } from '@camera-lab/image-core';
 
@@ -156,5 +160,95 @@ describe('Darkroom Pipeline & Ghost Affine Engine', () => {
     expect(diff.data[0]).toBe(20);
     expect(diff.data[1]).toBe(10);
     expect(diff.data[2]).toBe(0);
+  });
+
+  it('computes 256-bin RGB & Luminance histogram, dynamic range stops, and clipping telemetry', () => {
+    const width = 4;
+    const height = 4;
+    const data = new Uint8ClampedArray(width * height * 4);
+    for (let i = 0; i < data.length; i += 4) {
+      const idx = i / 4;
+      if (idx === 0) {
+        data[i] = 0;
+        data[i + 1] = 0;
+        data[i + 2] = 0;
+      } else if (idx === 15) {
+        data[i] = 255;
+        data[i + 1] = 255;
+        data[i + 2] = 255;
+      } else {
+        data[i] = 128;
+        data[i + 1] = 128;
+        data[i + 2] = 128;
+      }
+      data[i + 3] = 255;
+    }
+
+    const hist = computeHistogram({ width, height, data });
+    expect(hist.r).toHaveLength(256);
+    expect(hist.luma).toHaveLength(256);
+    expect(hist.r[0]).toBe(1);
+    expect(hist.r[128]).toBe(14);
+    expect(hist.r[255]).toBe(1);
+    expect(hist.shadowClipPercent).toBeGreaterThan(0);
+    expect(hist.highlightClipPercent).toBeGreaterThan(0);
+    expect(hist.dynamicRangeStops).toBeGreaterThan(7);
+  });
+
+  it('estimates translation offset via Normalized Cross-Correlation (NCC) and parses/normalizes EXIF orientation', () => {
+    const w = 32;
+    const h = 32;
+    const ref = new Uint8ClampedArray(w * h * 4);
+    const cur = new Uint8ClampedArray(w * h * 4);
+
+    // Draw a bright feature block at (12, 10) in ref and shifted to (14, 11) in cur
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const idx = (y * w + x) * 4;
+        const inRefBox = x >= 10 && x <= 16 && y >= 8 && y <= 14;
+        const inCurBox = x >= 12 && x <= 18 && y >= 9 && y <= 15;
+        const rv = inRefBox ? 230 : 30;
+        const cv = inCurBox ? 230 : 30;
+        ref[idx] = rv;
+        ref[idx + 1] = rv;
+        ref[idx + 2] = rv;
+        ref[idx + 3] = 255;
+        cur[idx] = cv;
+        cur[idx + 1] = cv;
+        cur[idx + 2] = cv;
+        cur[idx + 3] = 255;
+      }
+    }
+
+    const suggestion = estimateTranslationOffsetNcc(
+      { width: w, height: h, data: ref },
+      { width: w, height: h, data: cur }
+    );
+    expect(suggestion.nccScore).toBeGreaterThan(0.8);
+    expect(suggestion.translationX).toBeGreaterThan(0);
+
+    // Build minimal synthetic JPEG header with little-endian EXIF Orientation = 6 (90 CW)
+    const exifBytes = new Uint8Array([
+      0xff, 0xd8, // SOI
+      0xff, 0xe1, 0x00, 0x1e, // APP1 length 30
+      0x45, 0x78, 0x69, 0x66, 0x00, 0x00, // "Exif\0\0"
+      0x49, 0x49, 0x2a, 0x00, 0x08, 0x00, 0x00, 0x00, // TIFF II header, offset 8
+      0x01, 0x00, // 1 IFD entry
+      0x12, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, // Tag 0x0112 = 6
+      0xff, 0xd9 // EOI
+    ]);
+    expect(parseJpegExifOrientation(exifBytes)).toBe(6);
+
+    // Normalize 2x1 buffer with orientation 6 -> becomes 1x2 rotated
+    const src2x1 = {
+      width: 2,
+      height: 1,
+      data: new Uint8ClampedArray([10, 20, 30, 255, 200, 210, 220, 255])
+    };
+    const rotated = normalizeBufferByExifOrientation(src2x1, 6);
+    expect(rotated.width).toBe(1);
+    expect(rotated.height).toBe(2);
+    expect(rotated.data[0]).toBe(10);
+    expect(rotated.data[4]).toBe(200);
   });
 });

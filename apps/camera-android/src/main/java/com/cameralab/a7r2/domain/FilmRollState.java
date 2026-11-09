@@ -7,7 +7,7 @@ import java.util.List;
 /**
  * Pure Java state model mirroring packages/domain/src/film/index.ts and
  * packages/contracts/schemas/film-roll.schema.json.
- * Zero Android dependencies so it can be unit-tested on host JVM.
+ * Zero Android dependencies so it can be unit-tested on host JVM (Java 7+ compatible).
  */
 public final class FilmRollState {
     public enum Status {
@@ -45,6 +45,46 @@ public final class FilmRollState {
         this.version = version;
     }
 
+    public static FilmRollState createLoaded(String id, String name, int capacity, boolean strictMode) {
+        return new FilmRollState(
+                id,
+                name,
+                capacity,
+                strictMode,
+                Status.LOADED,
+                Collections.<String>emptyList(),
+                1
+        );
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public int getCapacity() {
+        return capacity;
+    }
+
+    public boolean isStrictMode() {
+        return strictMode;
+    }
+
+    public Status getStatus() {
+        return status;
+    }
+
+    public List<String> getFrameIds() {
+        return frameIds;
+    }
+
+    public int getVersion() {
+        return version;
+    }
+
     public FilmRollState onCaptureCompleted(String captureId) {
         if (this.frameIds.contains(captureId)) {
             return this; // Idempotent deduplication matching AC-08
@@ -64,6 +104,94 @@ public final class FilmRollState {
                 next,
                 this.version + 1
         );
+    }
+
+    public FilmRollState seal() {
+        if (this.status == Status.SEALED) {
+            return this;
+        }
+        if (this.status != Status.LOADED) {
+            throw new IllegalStateException("ROLL_ALREADY_SEALED");
+        }
+        return new FilmRollState(
+                this.id,
+                this.name,
+                this.capacity,
+                this.strictMode,
+                Status.SEALED,
+                this.frameIds,
+                this.version + 1
+        );
+    }
+
+    public FilmRollState startDevelop() {
+        if (this.status != Status.SEALED && this.status != Status.DEVELOPING) {
+            throw new IllegalStateException("ROLL_NOT_LOADED");
+        }
+        return new FilmRollState(
+                this.id,
+                this.name,
+                this.capacity,
+                this.strictMode,
+                Status.DEVELOPING,
+                this.frameIds,
+                this.version + 1
+        );
+    }
+
+    public FilmRollState interruptDevelop() {
+        if (this.status != Status.DEVELOPING) {
+            return this;
+        }
+        return new FilmRollState(
+                this.id,
+                this.name,
+                this.capacity,
+                this.strictMode,
+                Status.SEALED,
+                this.frameIds,
+                this.version + 1
+        );
+    }
+
+    public FilmRollState completeDevelop() {
+        if (this.status != Status.DEVELOPING && this.status != Status.SEALED) {
+            throw new IllegalStateException("DEVELOP_INTERRUPTED");
+        }
+        return new FilmRollState(
+                this.id,
+                this.name,
+                this.capacity,
+                this.strictMode,
+                Status.DEVELOPED,
+                this.frameIds,
+                this.version + 1
+        );
+    }
+
+    public FilmRollState archive() {
+        if (this.status != Status.DEVELOPED) {
+            throw new IllegalStateException("ROLL_NOT_LOADED");
+        }
+        return new FilmRollState(
+                this.id,
+                this.name,
+                this.capacity,
+                this.strictMode,
+                Status.ARCHIVED,
+                this.frameIds,
+                this.version + 1
+        );
+    }
+
+    public void assertCanReview() {
+        if (this.strictMode
+                && (this.status == Status.EMPTY
+                || this.status == Status.LOADED
+                || this.status == Status.SEALED
+                || this.status == Status.DEVELOPING)) {
+            throw new IllegalStateException("REVIEW_LOCKED_BEFORE_DEVELOP");
+        }
     }
 
     public int getRemainingFrames() {

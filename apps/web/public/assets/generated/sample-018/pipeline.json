@@ -1,0 +1,74 @@
+{
+  "generator": "tools/assets/prepare-raw.py",
+  "generatorVersion": "1.1.0",
+  "rawpyVersion": "0.28.0",
+  "numpyVersion": "1.26.4",
+  "pillowVersion": "13.0.0",
+  "mode": "RAW_PIPELINE_PRECOMPUTED",
+  "honestyDisclosure": "Generated offline from an authentic CC0 Sony ILCE-7M2 (Sony 14-bit compressed ARW (3:2) \u00b7 CC24 D65) file via rawpy/LibRaw and NumPy. Demonstrates Camera Lab's open RAW educational pipeline; does NOT claim to be Sony BIONZ X proprietary ISP output.",
+  "sensorParameters": {
+    "cfaPattern": "RGBG",
+    "blackLevelPerChannel": [
+      512,
+      512,
+      512,
+      512
+    ],
+    "cameraWhiteBalanceMultipliers": [
+      2468.0,
+      1024.0,
+      1552.0,
+      1024.0
+    ],
+    "daylightWhiteBalanceMultipliers": [
+      2.550952911376953,
+      0.9247958064079285,
+      1.1455272436141968,
+      0.0
+    ]
+  },
+  "stages": [
+    {
+      "stageId": "RAW_SENSOR",
+      "file": "stage-00-mosaic.webp",
+      "sha256": "7d8b8189815604f6e5a62521af5be61de3ea093ad2bbd997d5a6d8ddd071d6fd",
+      "algorithm": "raw.raw_image_visible + raw.raw_colors_visible Bayer RGGB photosite visualization"
+    },
+    {
+      "stageId": "BLACK_LEVEL",
+      "file": "stage-01-black-level.webp",
+      "sha256": "b6e5ef8f71f05f843535a8f7cd7a176f36b1a17e9655391892e45319ec212b9c",
+      "algorithm": "Channel black-level subtraction [512, 512, 512, 512] + linear dynamic range normalization"
+    },
+    {
+      "stageId": "DEMOSAIC",
+      "file": "stage-02-demosaic.webp",
+      "sha256": "c8563f706879b3e05046cbd9ba9ab960f657c56a40996253030a23bc0a0116eb",
+      "algorithm": "LibRaw AHD demosaic with unity WB [1,1,1,1] and no_auto_bright=True"
+    },
+    {
+      "stageId": "WHITE_BALANCE",
+      "file": "stage-03-white-balance.webp",
+      "sha256": "78fe68151a5e9de7792ffe6bda3ee8b2392bc4034f822d206f23f45bd469fce2",
+      "algorithm": "LibRaw AHD demosaic + camera As-Shot WB multipliers [2468.0, 1024.0, 1552.0]"
+    },
+    {
+      "stageId": "TONE",
+      "file": "stage-04-tone.webp",
+      "sha256": "53e041c5ceefb860fd3fc774254e90369f7500eff4b7cd45cf48af87365eb715",
+      "algorithm": "LibRaw sRGB gamma (2.222, 4.5) + histogram exposure mapping"
+    },
+    {
+      "stageId": "FILM_LOOK",
+      "file": "stage-05-film.webp",
+      "sha256": "0403e2a9b3ada90082968aaa613a87b8e34a654167dba4468fc35c61468c3379",
+      "algorithm": "S-curve tonal contrast + Classic Color channel balance"
+    },
+    {
+      "stageId": "JPEG_EXPORT",
+      "file": "final.jpg",
+      "sha256": "fd535ca774eb6066beae099b864cdb261478bd5c29f591f4cf53b6aa062310e8",
+      "algorithm": "Pillow JPEG encoder (quality=92, EXIF GPS stripped)"
+    }
+  ]
+}

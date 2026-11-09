@@ -38,10 +38,11 @@ pnpm assets:check
 # 3. 启动本地开发服务器
 pnpm dev
 
-# 4. 运行代码检查、类型检查、单测、事件重放、E2E 测试与生产构建
+# 4. 运行代码检查、类型检查、单测、Java 跨平台契约测试、事件重放、E2E 测试与生产构建
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm test:java
 pnpm debug:replay -- tests/fixtures/capture-duplicate.jsonl
 pnpm test:e2e
 pnpm build

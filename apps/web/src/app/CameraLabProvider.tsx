@@ -18,7 +18,10 @@ import type {
   GhostSession,
   ImageAsset
 } from '@camera-lab/contracts';
-import type { FaultInjectionConfig } from '@camera-lab/adapters-mock';
+import type {
+  FaultInjectionConfig,
+  PoolExhaustionStrategy
+} from '@camera-lab/adapters-mock';
 import {
   applyCaptureCompleted,
   archiveFilmRoll,
@@ -33,6 +36,10 @@ import {
   updateGhostSession,
   type GhostTransformParams
 } from '@camera-lab/domain';
+import {
+  normalizeBufferByExifOrientation,
+  parseJpegExifOrientation
+} from '@camera-lab/image-core';
 import {
   cameraPort,
   diagnostics,
@@ -96,6 +103,14 @@ interface CameraLabContextValue {
   updateFaultConfig: (patch: Partial<FaultInjectionConfig>) => void;
   resetFaultConfig: () => void;
   applyReplayJsonlToStore: (jsonl: string) => Promise<void>;
+  poolStrategy: PoolExhaustionStrategy;
+  changePoolStrategy: (strategy: PoolExhaustionStrategy) => Promise<void>;
+  exportBackupJson: () => Promise<string>;
+  importBackupJson: (jsonText: string) => Promise<{
+    rollsImported: number;
+    capturesImported: number;
+    ghostSessionsImported: number;
+  }>;
 }
 
 const CameraLabContext = createContext<CameraLabContextValue | null>(null);
@@ -125,6 +140,9 @@ export const CameraLabProvider: React.FC<{ children: React.ReactNode }> = ({
     '相机模拟器就绪 · Sony ILCE-7RM2 (MockPort)'
   );
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
+  const [poolStrategy, setPoolStrategy] = useState<PoolExhaustionStrategy>(
+    cameraPort.getExhaustionStrategy()
+  );
 
   const selectedRollId = useUiStore((s) => s.selectedRollId);
   const setSelectedRollId = useUiStore((s) => s.setSelectedRollId);
@@ -167,16 +185,16 @@ export const CameraLabProvider: React.FC<{ children: React.ReactNode }> = ({
 
         await cameraPort.openSession();
 
-        // Ensure manifest assets exist in IndexedDB
-        if (storedAssets.length === 0) {
-          for (const asset of initialManifestAssets) {
+        // Ensure all manifest assets exist in IndexedDB (sync newly added M1 RAW assets as well)
+        const storedIds = new Set(storedAssets.map((a) => a.id));
+        for (const asset of initialManifestAssets) {
+          if (!storedIds.has(asset.id)) {
             await storagePort.saveAsset(asset);
           }
-        } else {
-          for (const asset of storedAssets) {
-            if (asset.origin === 'USER_IMPORT') {
-              await mediaPort.importUserAsset(asset);
-            }
+        }
+        for (const asset of storedAssets) {
+          if (asset.origin === 'USER_IMPORT') {
+            await mediaPort.importUserAsset(asset);
           }
         }
 
@@ -646,40 +664,94 @@ export const CameraLabProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const importLocalImageFile = useCallback(
     async (file: File): Promise<ImageAsset> => {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
+      const arrayBuf = await file.arrayBuffer();
+      const rawBytes = new Uint8Array(arrayBuf);
+      const exifOrientation = parseJpegExifOrientation(rawBytes);
+
+      // Compute authentic SHA-256 of local file
+      let hexDigest = `local-${Date.now().toString(16).padStart(16, '0')}`;
+      if (typeof crypto !== 'undefined' && crypto.subtle) {
+        try {
+          const hashBuf = await crypto.subtle.digest('SHA-256', arrayBuf);
+          hexDigest = Array.from(new Uint8Array(hashBuf))
+            .map((b) => b.toString(16).padStart(2, '0'))
+            .join('');
+        } catch {
+          // Keep fallback digest
+        }
+      }
+
+      const rawDataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result));
         reader.onerror = () => reject(new Error('读取本地图片失败'));
         reader.readAsDataURL(file);
       });
 
-      const dims = await new Promise<{ width: number; height: number }>(
-        (resolve) => {
-          const img = new Image();
-          img.onload = () =>
-            resolve({
-              width: img.naturalWidth || 960,
-              height: img.naturalHeight || 640
-            });
-          img.onerror = () => resolve({ width: 960, height: 640 });
-          img.src = dataUrl;
-        }
-      );
+      const normalized = await new Promise<{
+        width: number;
+        height: number;
+        dataUrl: string;
+      }>((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const sw = img.naturalWidth || 960;
+          const sh = img.naturalHeight || 640;
+          if (exifOrientation > 1 && exifOrientation <= 8) {
+            const c = document.createElement('canvas');
+            c.width = sw;
+            c.height = sh;
+            const ctx = c.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, sw, sh);
+              const srcBuf = ctx.getImageData(0, 0, sw, sh);
+              const normBuf = normalizeBufferByExifOrientation(
+                { width: sw, height: sh, data: srcBuf.data },
+                exifOrientation
+              );
+              const outC = document.createElement('canvas');
+              outC.width = normBuf.width;
+              outC.height = normBuf.height;
+              outC
+                .getContext('2d')
+                ?.putImageData(
+                  new ImageData(
+                    new Uint8ClampedArray(normBuf.data),
+                    normBuf.width,
+                    normBuf.height
+                  ),
+                  0,
+                  0
+                );
+              resolve({
+                width: normBuf.width,
+                height: normBuf.height,
+                dataUrl: outC.toDataURL('image/jpeg', 0.92)
+              });
+              return;
+            }
+          }
+          resolve({ width: sw, height: sh, dataUrl: rawDataUrl });
+        };
+        img.onerror = () =>
+          resolve({ width: 960, height: 640, dataUrl: rawDataUrl });
+        img.src = rawDataUrl;
+      });
 
       const newAsset: ImageAsset = {
         id: `user-${Date.now().toString(36)}`,
         title: file.name.replace(/\.[^.]+$/, '') || 'User Imported Photo',
         origin: 'USER_IMPORT',
-        url: dataUrl,
-        sha256: `local-${Date.now().toString(16).padStart(16, '0')}`,
+        url: normalized.dataUrl,
+        sha256: hexDigest,
         license: 'USER-LOCAL-ONLY',
         licenseUrl: 'https://camera-lab.local/policy/local-import',
         author: 'Local User (Browser Only - Never Uploaded)',
-        width: dims.width,
-        height: dims.height,
+        width: normalized.width,
+        height: normalized.height,
         mimeType: file.type || 'image/jpeg',
         canRedistribute: false,
-        cameraModel: 'User Imported',
+        cameraModel: `User Imported (EXIF Orientation=${exifOrientation})`,
         pipelineMode: 'JPEG_SIMULATION',
         createdAt: new Date().toISOString(),
         version: 1
@@ -688,7 +760,9 @@ export const CameraLabProvider: React.FC<{ children: React.ReactNode }> = ({
       const saved = await mediaPort.importUserAsset(newAsset);
       await storagePort.saveAsset(saved);
       setAssets(await mediaPort.listAssets());
-      setStatusMessage(`已从本机导入照片「${saved.title}」（仅保存在本地浏览器）`);
+      setStatusMessage(
+        `已从本机导入照片「${saved.title}」（EXIF 方向 ${exifOrientation} 已标准化，仅存本地浏览器）`
+      );
       return saved;
     },
     []
@@ -836,6 +910,73 @@ export const CameraLabProvider: React.FC<{ children: React.ReactNode }> = ({
     [setSelectedRollId]
   );
 
+  const changePoolStrategy = useCallback(
+    async (strategy: PoolExhaustionStrategy) => {
+      cameraPort.setExhaustionStrategy(strategy);
+      setPoolStrategy(strategy);
+      setErrorBanner(null);
+      setStatusMessage(
+        `样片池耗尽策略已切换为：${
+          strategy === 'CYCLE' ? 'CYCLE (循环取样)' : 'PAUSE (耗尽暂停提示)'
+        }`
+      );
+      diagnostics.emit({
+        level: 'INFO',
+        domain: 'CAMERA',
+        name: 'pool.strategy_changed',
+        adapter: 'MOCK',
+        details: { strategy }
+      });
+    },
+    []
+  );
+
+  const exportBackupJson = useCallback(async (): Promise<string> => {
+    const snap = await storagePort.exportBackup();
+    diagnostics.emit({
+      level: 'INFO',
+      domain: 'STORAGE',
+      name: 'backup.exported',
+      adapter: 'MOCK',
+      details: {
+        rollsCount: snap.rolls.length,
+        capturesCount: snap.captures.length,
+        ghostSessionsCount: snap.ghostSessions.length
+      }
+    });
+    return JSON.stringify(snap, null, 2);
+  }, []);
+
+  const importBackupJson = useCallback(
+    async (jsonText: string) => {
+      const parsed = JSON.parse(jsonText);
+      const res = await storagePort.importBackup(parsed);
+      const [allRolls, allGhosts] = await Promise.all([
+        storagePort.listRolls(),
+        storagePort.listGhostSessions()
+      ]);
+      const capMap: Record<string, CaptureResult[]> = {};
+      for (const r of allRolls) {
+        capMap[r.id] = await storagePort.listCapturesByRoll(r.id);
+      }
+      setRolls(allRolls);
+      setCapturesByRoll(capMap);
+      setGhostSessions(allGhosts);
+      setStatusMessage(
+        `已恢复备份：${res.rollsImported} 卷胶卷、${res.capturesImported} 张拍摄记录、${res.ghostSessionsImported} 个重影会话`
+      );
+      diagnostics.emit({
+        level: 'INFO',
+        domain: 'STORAGE',
+        name: 'backup.imported',
+        adapter: 'MOCK',
+        details: res
+      });
+      return res;
+    },
+    []
+  );
+
   const value: CameraLabContextValue = {
     hydrated,
     capabilities,
@@ -867,7 +1008,11 @@ export const CameraLabProvider: React.FC<{ children: React.ReactNode }> = ({
     saveExportDerivative,
     updateFaultConfig,
     resetFaultConfig,
-    applyReplayJsonlToStore
+    applyReplayJsonlToStore,
+    poolStrategy,
+    changePoolStrategy,
+    exportBackupJson,
+    importBackupJson
   };
 
   return (
