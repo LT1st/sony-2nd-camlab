@@ -13,3 +13,4 @@ assets/raw/*.dng
 .env.local
 .DS_Store
 *.log
+*.tsbuildinfo
