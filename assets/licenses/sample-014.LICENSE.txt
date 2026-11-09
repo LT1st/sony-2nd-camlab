@@ -1,0 +1,9 @@
+Asset ID: sample-014
+Title: Sumida Iron Bridge [2026 Blue Hour Current]
+Author: Camera Lab Open Plates (Procedural CC0)
+License: CC0-1.0 (Creative Commons Zero v1.0 Universal)
+License URL: https://creativecommons.org/publicdomain/zero/1.0/
+Source URL: https://camera-lab.local/assets/samples/sample-014.jpg
+SHA256: 813a848b2af371d4381b0253204673d62126d7ea5f38201add8e2252dac6bdea
+Redistribution Allowed: true
+EXIF Privacy Audit: Passed (No GPS / No facial biometric PII)

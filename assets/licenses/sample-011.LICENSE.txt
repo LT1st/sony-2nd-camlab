@@ -1,0 +1,9 @@
+Asset ID: sample-011
+Title: Marunouchi Station Plaza [1986 Archive Reference]
+Author: Camera Lab Open Plates (Procedural CC0)
+License: CC0-1.0 (Creative Commons Zero v1.0 Universal)
+License URL: https://creativecommons.org/publicdomain/zero/1.0/
+Source URL: https://camera-lab.local/assets/samples/sample-011.jpg
+SHA256: 74812b56d81c2b19c667d7397a99c7ec528bd8e25997fe0d6df22c39aa81fb4c
+Redistribution Allowed: true
+EXIF Privacy Audit: Passed (No GPS / No facial biometric PII)

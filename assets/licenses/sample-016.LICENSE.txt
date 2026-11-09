@@ -1,0 +1,9 @@
+Asset ID: sample-016
+Title: Shibuya Skyline Overlook [Winter Clear Current]
+Author: Camera Lab Open Plates (Procedural CC0)
+License: CC0-1.0 (Creative Commons Zero v1.0 Universal)
+License URL: https://creativecommons.org/publicdomain/zero/1.0/
+Source URL: https://camera-lab.local/assets/samples/sample-016.jpg
+SHA256: 5d0fd5d4acd4487e328696e3ecdb3aa936c9d9b630d62ad93658a371215703aa
+Redistribution Allowed: true
+EXIF Privacy Audit: Passed (No GPS / No facial biometric PII)

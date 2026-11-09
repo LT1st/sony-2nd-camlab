@@ -1,0 +1,9 @@
+Asset ID: sample-007
+Title: Yokohama Pier Golden Hour · 35mm f/2.0
+Author: Camera Lab Open Plates (Procedural CC0)
+License: CC0-1.0 (Creative Commons Zero v1.0 Universal)
+License URL: https://creativecommons.org/publicdomain/zero/1.0/
+Source URL: https://camera-lab.local/assets/samples/sample-007.jpg
+SHA256: 9dbd57b193e94847ba842043486893f57bb623b5a6fd87623f22beebcacb3362
+Redistribution Allowed: true
+EXIF Privacy Audit: Passed (No GPS / No facial biometric PII)

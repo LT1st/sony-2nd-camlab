@@ -1,0 +1,9 @@
+Asset ID: sample-013
+Title: Sumida Iron Bridge [1998 Daylight Reference]
+Author: Camera Lab Open Plates (Procedural CC0)
+License: CC0-1.0 (Creative Commons Zero v1.0 Universal)
+License URL: https://creativecommons.org/publicdomain/zero/1.0/
+Source URL: https://camera-lab.local/assets/samples/sample-013.jpg
+SHA256: 7bb1cf2282ad1e6c3880dbb713abfbc796a881a600ba4ebdef870be061df9ac5
+Redistribution Allowed: true
+EXIF Privacy Audit: Passed (No GPS / No facial biometric PII)

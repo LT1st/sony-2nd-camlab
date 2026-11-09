@@ -1,0 +1,9 @@
+Asset ID: sample-010
+Title: Tsukiji Morning Market Arcade · 28mm f/2.8
+Author: Camera Lab Open Plates (Procedural CC0)
+License: CC0-1.0 (Creative Commons Zero v1.0 Universal)
+License URL: https://creativecommons.org/publicdomain/zero/1.0/
+Source URL: https://camera-lab.local/assets/samples/sample-010.jpg
+SHA256: 1655a733fcefb38646e440b78c619fd89b4ba574152a2f3ca70c8b4e1748fafb
+Redistribution Allowed: true
+EXIF Privacy Audit: Passed (No GPS / No facial biometric PII)

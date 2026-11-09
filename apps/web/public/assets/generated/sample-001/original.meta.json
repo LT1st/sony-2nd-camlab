@@ -1,0 +1,24 @@
+{
+  "sampleId": "sample-001",
+  "cameraMake": "Sony",
+  "cameraModel": "ILCE-7RM2",
+  "rawFormat": "Sony 14-bit compressed ARW (3:2)",
+  "sourceRepository": "https://raw.pixls.us/",
+  "sourceUrl": "https://raw.pixls.us/",
+  "downloadUrl": "https://raw.pixls.us/getfile.php/1312/nice/Sony%20-%20ILCE-7RM2%20-%2014bit%2014bit%20compressed%20(3:2).ARW",
+  "license": "CC0-1.0",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "canRedistribute": true,
+  "originalRawFilename": "ilce-7rm2-14bit-compressed.ARW",
+  "originalRawSha256": "f067629e2b36706e8173e37f3e6e903b4501d97f51ce7ceb43e9d71da929aa54",
+  "originalDimensions": {
+    "width": 7968,
+    "height": 5320
+  },
+  "previewDimensions": {
+    "width": 960,
+    "height": 641
+  },
+  "finalJpegSha256": "064e11da8b3254a34e2d463f99415b418daedce809e23ef892efe130b341ec33",
+  "generatedAt": "2026-11-09T09:54:09.196959+00:00"
+}
