@@ -1,0 +1,17 @@
+{
+  "description": "Cross-platform contract test vectors shared between Web (TS) and future Sony Android (Java)",
+  "schemaVersion": "1.0.0",
+  "vectors": {
+    "expectedFilmTransitionSequence": [
+      { "from": "EMPTY", "event": "roll.load", "to": "LOADED" },
+      { "from": "LOADED", "event": "roll.seal", "to": "SEALED" },
+      { "from": "SEALED", "event": "develop.start", "to": "DEVELOPING" },
+      { "from": "DEVELOPING", "event": "develop.complete", "to": "DEVELOPED" },
+      { "from": "DEVELOPED", "event": "roll.archive", "to": "ARCHIVED" }
+    ],
+    "rejectedTransitions": [
+      { "from": "SEALED", "event": "capture.completed", "expectedErrorCode": "ROLL_ALREADY_SEALED" },
+      { "from": "LOADED", "event": "roll.inspect_frame_strict", "expectedErrorCode": "REVIEW_LOCKED_BEFORE_DEVELOP" }
+    ]
+  }
+}

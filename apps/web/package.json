@@ -1,0 +1,26 @@
+{
+  "name": "@camera-lab/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@camera-lab/adapters-mock": "workspace:*",
+    "@camera-lab/camera-port": "workspace:*",
+    "@camera-lab/contracts": "workspace:*",
+    "@camera-lab/diagnostics": "workspace:*",
+    "@camera-lab/domain": "workspace:*",
+    "@camera-lab/image-core": "workspace:*",
+    "@camera-lab/persistence": "workspace:*",
+    "@camera-lab/ui": "workspace:*",
+    "lucide-react": "0.468.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-router-dom": "6.28.0",
+    "zustand": "5.0.2"
+  }
+}
