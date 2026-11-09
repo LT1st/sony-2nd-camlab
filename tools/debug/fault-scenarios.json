@@ -1,0 +1,77 @@
+{
+  "schemaVersion": "1.0.0",
+  "scenarios": [
+    {
+      "id": "fault-4th-capture-fail",
+      "title": "第 4 张拍摄失败 (AC-07)",
+      "description": "当胶卷拍摄到第 4 张时触发 SHUTTER_FAILED，验证帧数不虚增且界面可重试恢复。",
+      "patch": {
+        "failOnFrameNumber": 4
+      }
+    },
+    {
+      "id": "fault-next-shutter-fail",
+      "title": "下一次快门失败",
+      "description": "下一次按快门立即返回 SHUTTER_FAILED。",
+      "patch": {
+        "failNextCapture": true
+      }
+    },
+    {
+      "id": "fault-shutter-delay-3s",
+      "title": "快门写入延迟 3 秒",
+      "description": "模拟慢速存储卡写入耗时 3000ms，测试 CAMERA_BUSY 防抖与状态反馈。",
+      "patch": {
+        "shutterDelayMs": 3000
+      }
+    },
+    {
+      "id": "fault-duplicate-event",
+      "title": "重复完成事件 (AC-08)",
+      "description": "同一个 captureId 的 capture.completed 事件连续发送 2 次，验证幂等去重只计 1 张。",
+      "patch": {
+        "duplicateCaptureCompleted": true
+      }
+    },
+    {
+      "id": "fault-asset-404",
+      "title": "网络样片 404 不可达 (AC-09)",
+      "description": "模拟样片 URL 404 (ASSET_MISSING)，验证 UI 显示可恢复提示与切换样片入口。",
+      "patch": {
+        "simulateAsset404": true
+      }
+    },
+    {
+      "id": "fault-corrupted-image",
+      "title": "损坏图片 (AC-09)",
+      "description": "模拟图片解码失败 (ASSET_CORRUPTED)，验证不崩溃且允许换图。",
+      "patch": {
+        "simulateCorruptedAsset": true
+      }
+    },
+    {
+      "id": "fault-storage-full",
+      "title": "存储配额满 (STORAGE_FULL)",
+      "description": "模拟 SD 卡或 IndexedDB 配额满，拍照不虚增计数、导出不覆盖原图。",
+      "patch": {
+        "simulateStorageFull": true
+      }
+    },
+    {
+      "id": "fault-interrupt-develop",
+      "title": "刷新/中断显影任务",
+      "description": "在胶卷冲洗或暗房显影中途触发中断，验证原始照片完整且可恢复继续冲洗。",
+      "patch": {
+        "interruptDevelopOnStage": "DEMOSAIC"
+      }
+    },
+    {
+      "id": "fault-parallel-export-conflict",
+      "title": "并行导出冲突 (EXPORT_CONFLICT)",
+      "description": "模拟并发导出冲突，验证提示重试且不破坏现有导出记录。",
+      "patch": {
+        "simulateParallelExportConflict": true
+      }
+    }
+  ]
+}
