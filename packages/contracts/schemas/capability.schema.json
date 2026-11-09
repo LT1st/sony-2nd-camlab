@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://camera-lab.local/schemas/capability.schema.json",
+  "title": "CameraCapabilities",
+  "type": "object",
+  "required": [
+    "deviceModel",
+    "firmwareVersion",
+    "adapterType",
+    "screenLogicalSize",
+    "sensorAspect",
+    "liveView",
+    "captureJPEG",
+    "captureRAW",
+    "rawDemoAssets",
+    "keyEvents",
+    "previewOverlay",
+    "focusDrive",
+    "rawBuffer",
+    "saveToCard",
+    "dspProcessing",
+    "maxPreviewSize"
+  ],
+  "properties": {
+    "deviceModel": { "type": "string" },
+    "firmwareVersion": { "type": "string" },
+    "adapterType": { "type": "string", "enum": ["MOCK", "SONY_ANDROID_STUB", "SONY_A7R2"] },
+    "screenLogicalSize": {
+      "type": "object",
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "integer" },
+        "height": { "type": "integer" }
+      }
+    },
+    "sensorAspect": { "type": "string", "enum": ["3:2"] },
+    "liveView": { "type": "string", "enum": ["available", "simulated", "unavailable", "unknown"] },
+    "captureJPEG": { "type": "string", "enum": ["available", "simulated", "unavailable", "unknown"] },
+    "captureRAW": { "type": "string", "enum": ["available", "simulated", "unavailable", "unknown"] },
+    "rawDemoAssets": { "type": "string", "enum": ["available", "unavailable", "unknown"] },
+    "keyEvents": { "type": "string", "enum": ["available", "simulated", "unavailable", "unknown"] },
+    "previewOverlay": { "type": "string", "enum": ["available", "web-rendered", "unavailable", "unknown"] },
+    "focusDrive": { "type": "string", "enum": ["available", "simulated", "unavailable", "unknown"] },
+    "rawBuffer": { "type": "string", "enum": ["available", "unavailable", "unknown"] },
+    "saveToCard": { "type": "string", "enum": ["available", "simulated", "unavailable", "unknown"] },
+    "dspProcessing": { "type": "string", "enum": ["available", "unavailable", "unknown"] },
+    "maxPreviewSize": {
+      "type": "object",
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "integer" },
+        "height": { "type": "integer" }
+      }
+    }
+  },
+  "additionalProperties": false
+}

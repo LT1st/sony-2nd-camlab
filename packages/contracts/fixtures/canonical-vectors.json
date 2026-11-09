@@ -1,0 +1,80 @@
+{
+  "filmRoll": {
+    "id": "roll-2026-001",
+    "name": "Shinjuku Dusk 400",
+    "capacity": 12,
+    "preset": "CLASSIC_COLOR",
+    "strictMode": true,
+    "status": "LOADED",
+    "frameIds": ["cap-001", "cap-002", "cap-003"],
+    "createdAt": "2026-11-09T08:00:00.000Z",
+    "updatedAt": "2026-11-09T08:05:00.000Z",
+    "version": 4
+  },
+  "captureResult": {
+    "captureId": "cap-001",
+    "rollId": "roll-2026-001",
+    "frameIndex": 1,
+    "assetId": "sample-001",
+    "capturedAt": "2026-11-09T08:01:00.000Z",
+    "source": "MOCK",
+    "mode": "JPEG_SIMULATION",
+    "originalPreserved": true,
+    "exposureMeta": {
+      "shutterSpeed": "1/250",
+      "aperture": "f/2.8",
+      "iso": 400,
+      "focalLengthMm": 35
+    }
+  },
+  "capabilities": {
+    "deviceModel": "ILCE-7RM2 (Simulated)",
+    "firmwareVersion": "4.01-mock",
+    "adapterType": "MOCK",
+    "screenLogicalSize": { "width": 640, "height": 480 },
+    "sensorAspect": "3:2",
+    "liveView": "simulated",
+    "captureJPEG": "simulated",
+    "captureRAW": "unavailable",
+    "rawDemoAssets": "available",
+    "keyEvents": "simulated",
+    "previewOverlay": "web-rendered",
+    "focusDrive": "unavailable",
+    "rawBuffer": "unavailable",
+    "saveToCard": "simulated",
+    "dspProcessing": "unavailable",
+    "maxPreviewSize": { "width": 1200, "height": 800 }
+  },
+  "ghostSession": {
+    "id": "ghost-session-001",
+    "name": "Tokyo Station 1986 vs 2026",
+    "referenceAssetId": "sample-013",
+    "currentAssetId": "sample-014",
+    "translationX": 0.04,
+    "translationY": -0.02,
+    "scale": 1.2,
+    "rotationDeg": 10,
+    "opacity": 0.5,
+    "comparisonMode": "overlay",
+    "updatedAt": "2026-11-09T08:10:00.000Z",
+    "version": 2
+  },
+  "diagnosticEvent": {
+    "timestamp": "2026-11-09T08:01:00.120Z",
+    "sessionId": "session-uuid-001",
+    "eventId": "evt-uuid-001",
+    "level": "INFO",
+    "domain": "FILM",
+    "name": "capture.completed",
+    "rollId": "roll-2026-001",
+    "captureId": "cap-001",
+    "durationMs": 120,
+    "adapter": "MOCK",
+    "stateBefore": "LOADED(0/12)",
+    "stateAfter": "LOADED(1/12)",
+    "details": {
+      "frameIndex": 1,
+      "assetId": "sample-001"
+    }
+  }
+}

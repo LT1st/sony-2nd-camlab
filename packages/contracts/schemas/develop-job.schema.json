@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://camera-lab.local/schemas/develop-job.schema.json",
+  "title": "DevelopJob",
+  "type": "object",
+  "required": [
+    "jobId",
+    "assetId",
+    "mode",
+    "status",
+    "currentStage",
+    "recipe",
+    "createdAt",
+    "updatedAt",
+    "version"
+  ],
+  "properties": {
+    "jobId": { "type": "string", "minLength": 1 },
+    "assetId": { "type": "string", "minLength": 1 },
+    "rollId": { "type": "string" },
+    "mode": { "type": "string", "enum": ["JPEG_SIMULATION", "RAW_PIPELINE_PRECOMPUTED"] },
+    "status": { "type": "string", "enum": ["IDLE", "DEVELOPING", "COMPLETED", "CANCELLED", "FAILED"] },
+    "currentStage": {
+      "type": "string",
+      "enum": [
+        "RAW_SENSOR",
+        "BLACK_LEVEL",
+        "DEMOSAIC",
+        "WHITE_BALANCE",
+        "TONE",
+        "FILM_LOOK",
+        "JPEG_EXPORT"
+      ]
+    },
+    "recipe": {
+      "type": "object",
+      "required": [
+        "exposureEv",
+        "temperatureShift",
+        "tintShift",
+        "contrast",
+        "saturation",
+        "toneCurve",
+        "grainAmount",
+        "filmPreset",
+        "jpegQuality"
+      ],
+      "properties": {
+        "exposureEv": { "type": "number", "minimum": -3, "maximum": 3 },
+        "temperatureShift": { "type": "number", "minimum": -100, "maximum": 100 },
+        "tintShift": { "type": "number", "minimum": -100, "maximum": 100 },
+        "contrast": { "type": "number", "minimum": -50, "maximum": 50 },
+        "saturation": { "type": "number", "minimum": -100, "maximum": 100 },
+        "toneCurve": { "type": "string", "enum": ["LINEAR", "S_CURVE_CLASSIC", "MATTE_SHADOW", "HIGH_KEY"] },
+        "grainAmount": { "type": "number", "minimum": 0, "maximum": 100 },
+        "filmPreset": { "type": "string", "enum": ["CLASSIC_COLOR", "WARM_AMBER", "MONO_SILVER"] },
+        "jpegQuality": { "type": "number", "minimum": 0.5, "maximum": 1 }
+      }
+    },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "version": { "type": "integer", "minimum": 1 }
+  },
+  "additionalProperties": false
+}

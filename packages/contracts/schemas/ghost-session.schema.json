@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://camera-lab.local/schemas/ghost-session.schema.json",
+  "title": "GhostSession",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "referenceAssetId",
+    "currentAssetId",
+    "translationX",
+    "translationY",
+    "scale",
+    "rotationDeg",
+    "opacity",
+    "comparisonMode",
+    "updatedAt",
+    "version"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "referenceAssetId": { "type": "string", "minLength": 1 },
+    "currentAssetId": { "type": "string", "minLength": 1 },
+    "translationX": { "type": "number", "minimum": -2, "maximum": 2 },
+    "translationY": { "type": "number", "minimum": -2, "maximum": 2 },
+    "scale": { "type": "number", "minimum": 0.1, "maximum": 5 },
+    "rotationDeg": { "type": "number", "minimum": -180, "maximum": 180 },
+    "opacity": { "type": "number", "minimum": 0, "maximum": 1 },
+    "comparisonMode": {
+      "type": "string",
+      "enum": ["overlay", "side-by-side", "split-slider", "difference"]
+    },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "version": { "type": "integer", "minimum": 1 }
+  },
+  "additionalProperties": false
+}

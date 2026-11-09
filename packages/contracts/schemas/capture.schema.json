@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://camera-lab.local/schemas/capture.schema.json",
+  "title": "CaptureResult",
+  "type": "object",
+  "required": [
+    "captureId",
+    "rollId",
+    "frameIndex",
+    "assetId",
+    "capturedAt",
+    "source",
+    "mode",
+    "originalPreserved",
+    "exposureMeta"
+  ],
+  "properties": {
+    "captureId": { "type": "string", "minLength": 1 },
+    "rollId": { "type": "string", "minLength": 1 },
+    "frameIndex": { "type": "integer", "minimum": 1 },
+    "assetId": { "type": "string", "minLength": 1 },
+    "capturedAt": { "type": "string", "format": "date-time" },
+    "source": { "type": "string", "enum": ["MOCK", "SONY_CAMERA"] },
+    "mode": { "type": "string", "enum": ["JPEG_SIMULATION", "RAW_PIPELINE_PRECOMPUTED"] },
+    "originalPreserved": { "type": "boolean" },
+    "exposureMeta": {
+      "type": "object",
+      "required": ["shutterSpeed", "aperture", "iso", "focalLengthMm"],
+      "properties": {
+        "shutterSpeed": { "type": "string" },
+        "aperture": { "type": "string" },
+        "iso": { "type": "integer", "minimum": 50 },
+        "focalLengthMm": { "type": "number", "minimum": 1 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,47 @@
+name: Camera Lab CI
+
+on:
+  push:
+    branches: [main, "cursor/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile=false
+
+      - name: Check environment & assets
+        run: |
+          pnpm doctor
+          pnpm assets:check
+
+      - name: Lint & Typecheck
+        run: |
+          pnpm lint
+          pnpm typecheck
+
+      - name: Run unit & integration tests
+        run: pnpm test
+
+      - name: Run JSONL Replay verification
+        run: pnpm debug:replay -- tests/fixtures/capture-duplicate.jsonl
+
+      - name: Build production web app
+        run: pnpm build

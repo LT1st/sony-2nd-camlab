@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.vite/
+coverage/
+playwright-report/
+test-results/
+assets/raw/*.ARW
+assets/raw/*.DNG
+assets/raw/*.arw
+assets/raw/*.dng
+!assets/raw/.gitkeep
+.env
+.env.local
+.DS_Store
+*.log

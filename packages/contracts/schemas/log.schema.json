@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://camera-lab.local/schemas/log.schema.json",
+  "title": "DiagnosticEvent",
+  "type": "object",
+  "required": [
+    "timestamp",
+    "sessionId",
+    "eventId",
+    "level",
+    "domain",
+    "name",
+    "adapter",
+    "details"
+  ],
+  "properties": {
+    "timestamp": { "type": "string", "format": "date-time" },
+    "sessionId": { "type": "string", "minLength": 1 },
+    "eventId": { "type": "string", "minLength": 1 },
+    "level": { "type": "string", "enum": ["DEBUG", "INFO", "WARN", "ERROR"] },
+    "domain": { "type": "string", "enum": ["FILM", "DARKROOM", "GHOST", "CAMERA", "STORAGE", "SYSTEM"] },
+    "name": { "type": "string", "minLength": 1 },
+    "rollId": { "type": "string" },
+    "captureId": { "type": "string" },
+    "durationMs": { "type": "number", "minimum": 0 },
+    "errorCode": { "type": "string" },
+    "adapter": { "type": "string", "enum": ["MOCK", "SONY_CAMERA"] },
+    "stateBefore": { "type": "string" },
+    "stateAfter": { "type": "string" },
+    "details": { "type": "object" }
+  },
+  "additionalProperties": false
+}
