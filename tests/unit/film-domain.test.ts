@@ -184,5 +184,13 @@ describe('Film OS Domain & Contracts', () => {
     expect(summary.appliedEventsCount).toBe(3);
     expect(summary.deduplicatedCapturesCount).toBe(1);
     expect(summary.rolls.r1?.frameIds).toEqual(['c1']);
+    expect(summary.capturesByRoll.r1).toHaveLength(1);
+    expect(summary.capturesByRoll.r1?.[0]?.captureId).toBe('c1');
+
+    // Malformed lines are recorded in summary.errors without crashing
+    const withBadLine = `${jsonl}\n{bad-json-line}`;
+    const summaryWithErr = replayEventsJsonl(withBadLine);
+    expect(summaryWithErr.errors.length).toBeGreaterThan(0);
+    expect(summaryWithErr.rolls.r1?.frameIds).toEqual(['c1']);
   });
 });

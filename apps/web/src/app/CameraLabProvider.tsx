@@ -382,6 +382,9 @@ export const CameraLabProvider: React.FC<{ children: React.ReactNode }> = ({
     setStatusMessage(`快门按下 · 正在曝光第 ${nextFrameIndex} 张...`);
 
     let latestRollState = activeRoll;
+    let receivedCompletedEvent = false;
+    let eventChain = Promise.resolve();
+
     const handleEvent = async (evt: {
       type: string;
       captureId?: string;
@@ -389,6 +392,7 @@ export const CameraLabProvider: React.FC<{ children: React.ReactNode }> = ({
       result?: CaptureResult;
     }) => {
       if (evt.type === 'capture.completed' && evt.result) {
+        receivedCompletedEvent = true;
         const beforeStr = `${latestRollState.status}(${latestRollState.frameIds.length}/${latestRollState.capacity})`;
         const outcome = applyCaptureCompleted(latestRollState, {
           captureId: evt.result.captureId,
@@ -433,7 +437,7 @@ export const CameraLabProvider: React.FC<{ children: React.ReactNode }> = ({
     };
 
     const unsub = cameraPort.subscribeEvents((evt) => {
-      void handleEvent(evt);
+      eventChain = eventChain.then(() => handleEvent(evt));
     });
 
     try {
@@ -442,14 +446,24 @@ export const CameraLabProvider: React.FC<{ children: React.ReactNode }> = ({
         rollId: activeRoll.id,
         frameIndex: nextFrameIndex
       });
-      await handleEvent({
-        type: 'capture.completed',
-        captureId: result.captureId,
-        rollId: result.rollId,
-        result
-      });
-      const nextPreview = await cameraPort.getPreviewFrame();
-      setPreviewFrame(nextPreview);
+      await eventChain;
+      if (!receivedCompletedEvent) {
+        await handleEvent({
+          type: 'capture.completed',
+          captureId: result.captureId,
+          rollId: result.rollId,
+          result
+        });
+      }
+      let nextPreview: PreviewFrame | null = null;
+      try {
+        nextPreview = await cameraPort.getPreviewFrame();
+      } catch {
+        // If PAUSE strategy just exhausted the pool on this shot, keep last previewFrame without failing the shot itself
+      }
+      if (nextPreview) {
+        setPreviewFrame(nextPreview);
+      }
 
       const remaining = Math.max(
         0,
@@ -885,9 +899,18 @@ export const CameraLabProvider: React.FC<{ children: React.ReactNode }> = ({
       const replayedRolls = Object.values(summary.rolls);
       for (const r of replayedRolls) {
         await storagePort.saveRoll(r);
+        const caps = summary.capturesByRoll[r.id] ?? [];
+        for (const c of caps) {
+          await storagePort.saveCapture(c);
+        }
       }
       const allRolls = await storagePort.listRolls();
+      const capMap: Record<string, CaptureResult[]> = {};
+      for (const r of allRolls) {
+        capMap[r.id] = await storagePort.listCapturesByRoll(r.id);
+      }
       setRolls(allRolls);
+      setCapturesByRoll(capMap);
       if (summary.activeRollId) {
         setSelectedRollId(summary.activeRollId);
         await storagePort.setSetting('activeRollId', summary.activeRollId);

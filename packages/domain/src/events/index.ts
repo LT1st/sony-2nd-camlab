@@ -1,4 +1,6 @@
 import {
+  type CaptureResult,
+  CaptureResultSchema,
   type DiagnosticEvent,
   DiagnosticEventSchema,
   type FilmPreset,
@@ -17,6 +19,7 @@ import {
 
 export interface ReplayStateSummary {
   rolls: Record<string, FilmRoll>;
+  capturesByRoll: Record<string, CaptureResult[]>;
   activeRollId: string | null;
   appliedEventsCount: number;
   deduplicatedCapturesCount: number;
@@ -30,17 +33,32 @@ export function replayEventsJsonl(jsonlText: string): ReplayStateSummary {
     .map((line) => line.trim())
     .filter((line) => line.length > 0 && !line.startsWith('#'));
 
-  const events: DiagnosticEvent[] = lines.map((line) =>
-    DiagnosticEventSchema.parse(JSON.parse(line))
-  );
+  const events: DiagnosticEvent[] = [];
+  const parseErrors: string[] = [];
 
-  return replayDiagnosticEvents(events);
+  for (let idx = 0; idx < lines.length; idx++) {
+    try {
+      const parsed = DiagnosticEventSchema.parse(JSON.parse(lines[idx]!));
+      events.push(parsed);
+    } catch (err) {
+      parseErrors.push(
+        `Line ${idx + 1}: ${err instanceof Error ? err.message : 'Invalid JSONL event'}`
+      );
+    }
+  }
+
+  const summary = replayDiagnosticEvents(events);
+  if (parseErrors.length > 0) {
+    summary.errors.unshift(...parseErrors);
+  }
+  return summary;
 }
 
 export function replayDiagnosticEvents(
   events: DiagnosticEvent[]
 ): ReplayStateSummary {
   const rolls: Record<string, FilmRoll> = {};
+  const capturesByRoll: Record<string, CaptureResult[]> = {};
   let activeRollId: string | null = null;
   let appliedEventsCount = 0;
   let deduplicatedCapturesCount = 0;
@@ -79,6 +97,7 @@ export function replayDiagnosticEvents(
           strictMode,
           nowIso: evt.timestamp
         });
+        capturesByRoll[rollId] = capturesByRoll[rollId] ?? [];
         activeRollId = rollId;
       } else if (evt.name === 'capture.completed' && rollId) {
         const targetRoll = rolls[rollId];
@@ -99,6 +118,30 @@ export function replayDiagnosticEvents(
         rolls[rollId] = outcome.roll;
         if (outcome.deduplicated) {
           deduplicatedCapturesCount += 1;
+        } else {
+          const assetId =
+            typeof evt.details.assetId === 'string'
+              ? evt.details.assetId
+              : 'sample-001';
+          const frameIndex = outcome.roll.frameIds.length;
+          const captureRecord = CaptureResultSchema.parse({
+            captureId,
+            rollId,
+            frameIndex,
+            assetId,
+            capturedAt: evt.timestamp,
+            source: evt.adapter,
+            mode: 'JPEG_SIMULATION',
+            originalPreserved: true,
+            exposureMeta: {
+              shutterSpeed: '1/250',
+              aperture: 'f/2.8',
+              iso: 400,
+              focalLengthMm: 35
+            }
+          });
+          const list = capturesByRoll[rollId] ?? [];
+          capturesByRoll[rollId] = [...list, captureRecord];
         }
       } else if (evt.name === 'capture.failed') {
         failedCapturesCount += 1;
@@ -122,6 +165,7 @@ export function replayDiagnosticEvents(
 
   return {
     rolls,
+    capturesByRoll,
     activeRollId,
     appliedEventsCount,
     deduplicatedCapturesCount,

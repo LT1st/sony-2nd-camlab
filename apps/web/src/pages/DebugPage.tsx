@@ -155,16 +155,21 @@ export const DebugPage: React.FC = () => {
 
     const blob = new Blob([zipBytes], { type: 'application/zip' });
     const url = URL.createObjectURL(blob);
-    setZipExportInfo({
-      sizeBytes: zipBytes.byteLength,
-      url,
-      files: [
-        'logs.jsonl',
-        'app-state.json',
-        'capabilities.json',
-        'asset-manifest.json',
-        'repro-steps.txt'
-      ]
+    setZipExportInfo((prev) => {
+      if (prev?.url) {
+        URL.revokeObjectURL(prev.url);
+      }
+      return {
+        sizeBytes: zipBytes.byteLength,
+        url,
+        files: [
+          'logs.jsonl',
+          'app-state.json',
+          'capabilities.json',
+          'asset-manifest.json',
+          'repro-steps.txt'
+        ]
+      };
     });
   };
 
@@ -710,6 +715,7 @@ export const DebugPage: React.FC = () => {
                   a.href = url;
                   a.download = 'camera-lab-backup-v2.json';
                   a.click();
+                  setTimeout(() => URL.revokeObjectURL(url), 250);
                   setBackupBanner(
                     `已生成全量状态备份 JSON (${jsonStr.length} bytes)`
                   );

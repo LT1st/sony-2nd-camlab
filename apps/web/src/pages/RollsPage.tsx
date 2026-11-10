@@ -103,18 +103,17 @@ export const RollsPage: React.FC = () => {
 
     const intervalMs = Math.round(120 / developSpeed);
     const timer = setInterval(() => {
-      setDevelopProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(timer);
-          void completeRollDevelop(activeRoll.id);
-          return 100;
-        }
-        return Math.min(100, prev + 25);
-      });
+      setDevelopProgress((prev) => Math.min(100, prev + 25));
     }, intervalMs);
 
     return () => clearInterval(timer);
-  }, [activeRoll?.id, activeRoll?.status, completeRollDevelop, developSpeed]);
+  }, [activeRoll?.id, activeRoll?.status, developSpeed]);
+
+  useEffect(() => {
+    if (activeRoll?.status === 'DEVELOPING' && developProgress >= 100) {
+      void completeRollDevelop(activeRoll.id);
+    }
+  }, [activeRoll?.id, activeRoll?.status, completeRollDevelop, developProgress]);
 
   const handleExportContactSheet = async (format: 'image/jpeg' | 'image/png') => {
     if (!activeRoll) return;

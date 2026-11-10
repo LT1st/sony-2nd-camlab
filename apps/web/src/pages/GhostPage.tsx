@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { GhostComparisonMode } from '@camera-lab/contracts';
 import {
   clampGhostParams,
@@ -199,18 +199,29 @@ export const GhostPage: React.FC = () => {
     };
   }, [comparisonMode, curAsset, params, refAsset]);
 
-  const updateParamAndPersist = (patch: Partial<GhostTransformParams>) => {
-    const next = clampGhostParams({ ...params, ...patch });
-    setParams(next);
-    void saveGhostAlignment({
-      id: sessionId,
-      name: sessionName,
-      referenceAssetId,
+  const updateParamAndPersist = useCallback(
+    (patch: Partial<GhostTransformParams>) => {
+      const next = clampGhostParams({ ...params, ...patch });
+      setParams(next);
+      void saveGhostAlignment({
+        id: sessionId,
+        name: sessionName,
+        referenceAssetId,
+        currentAssetId,
+        params: next,
+        comparisonMode
+      });
+    },
+    [
+      comparisonMode,
       currentAssetId,
-      params: next,
-      comparisonMode
-    });
-  };
+      params,
+      referenceAssetId,
+      saveGhostAlignment,
+      sessionId,
+      sessionName
+    ]
+  );
 
   useEffect(() => {
     const handleKeyDown = (evt: KeyboardEvent) => {
@@ -251,7 +262,13 @@ export const GhostPage: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  });
+  }, [
+    params.rotationDeg,
+    params.translationX,
+    params.translationY,
+    soundEnabled,
+    updateParamAndPersist
+  ]);
 
   const handleSuggestAutoAlign = async () => {
     if (!refAsset || !curAsset) return;

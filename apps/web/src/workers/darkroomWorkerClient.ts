@@ -18,6 +18,17 @@ export interface ProcessedStageResult {
   histogram: ImageHistogram;
 }
 
+const EMPTY_HISTOGRAM: ImageHistogram = {
+  r: new Array<number>(256).fill(0),
+  g: new Array<number>(256).fill(0),
+  b: new Array<number>(256).fill(0),
+  luma: new Array<number>(256).fill(0),
+  meanLuma: 0,
+  dynamicRangeStops: 0,
+  shadowClipPercent: 0,
+  highlightClipPercent: 0
+};
+
 export class DarkroomProcessorClient {
   private worker: Worker | null = null;
   private readonly guard = new MonotonicJobGuard();
@@ -60,6 +71,18 @@ export class DarkroomProcessorClient {
 
   cancelPending(): void {
     this.guard.cancelActive();
+    for (const [token, resolve] of this.pendingResolvers.entries()) {
+      const dummy = new Uint8ClampedArray(4);
+      resolve({
+        jobId: 'cancelled',
+        token,
+        width: 1,
+        height: 1,
+        buffer: dummy.buffer,
+        durationMs: 0,
+        histogram: EMPTY_HISTOGRAM
+      });
+    }
     this.pendingResolvers.clear();
     this.queueDepth = 0;
   }
@@ -93,8 +116,10 @@ export class DarkroomProcessorClient {
           }
         );
 
-        this.lastDurationMs = workerResponse.durationMs;
         const isCurrent = this.guard.isCurrent(token, jobId);
+        if (isCurrent) {
+          this.lastDurationMs = workerResponse.durationMs;
+        }
         return {
           jobId,
           imageData: new ImageData(

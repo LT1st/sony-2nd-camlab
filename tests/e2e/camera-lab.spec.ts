@@ -209,6 +209,12 @@ test.describe('Camera Lab · AC-01 through AC-12 Full E2E Acceptance Suite', () 
     await expect(page.getByTestId('replay-dedup-count')).toHaveText('1');
     await expect(page.getByTestId('replay-roll-frame-count')).toHaveText('1');
 
+    // Sync replayed roll & captures into IndexedDB store
+    await page.getByTestId('btn-replay-apply-store').click();
+    await expect(page.getByTestId('header-roll-badge')).toContainText(
+      'Replay Verification Roll'
+    );
+
     await page.getByTestId('btn-export-diagnostics-zip').click();
     await expect(page.getByTestId('zip-export-result')).toContainText(
       '诊断 ZIP 已生成'
