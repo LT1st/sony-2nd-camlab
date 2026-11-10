@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { soundSynth } from '../adapters/soundSynth.js';
 import { useCameraLab } from '../app/CameraLabProvider.js';
 import { useUiStore } from '../stores/uiStore.js';
 
@@ -23,13 +24,72 @@ export const RollsPage: React.FC = () => {
   const developSpeed = useUiStore((s) => s.developSpeedMultiplier);
   const setDevelopSpeed = useUiStore((s) => s.setDevelopSpeedMultiplier);
   const setSelectedAssetId = useUiStore((s) => s.setSelectedAssetId);
+  const soundEnabled = useUiStore((s) => s.soundEnabled);
 
   const [developProgress, setDevelopProgress] = useState(0);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [focusedFrameIdx, setFocusedFrameIdx] = useState(0);
 
   const activeCaptures = activeRoll
     ? capturesByRoll[activeRoll.id] ?? []
     : [];
+
+  useEffect(() => {
+    const handleKeyDown = (evt: KeyboardEvent) => {
+      const target = evt.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT')
+      ) {
+        return;
+      }
+      if (evt.key === 'ArrowLeft' || evt.key === '[') {
+        evt.preventDefault();
+        soundSynth.play('DIAL_CLICK', soundEnabled);
+        setFocusedFrameIdx((p) =>
+          activeCaptures.length > 0
+            ? (p - 1 + activeCaptures.length) % activeCaptures.length
+            : 0
+        );
+      } else if (evt.key === 'ArrowRight' || evt.key === ']') {
+        evt.preventDefault();
+        soundSynth.play('DIAL_CLICK', soundEnabled);
+        setFocusedFrameIdx((p) =>
+          activeCaptures.length > 0 ? (p + 1) % activeCaptures.length : 0
+        );
+      } else if (evt.key === 'Enter' || evt.key === ' ') {
+        evt.preventDefault();
+        if (activeRoll?.status === 'SEALED') {
+          soundSynth.play('DEVELOP_AGITATE', soundEnabled);
+          setDevelopProgress(10);
+          void startRollDevelop(activeRoll.id);
+        } else if (
+          (activeRoll?.status === 'DEVELOPED' ||
+            activeRoll?.status === 'ARCHIVED') &&
+          activeCaptures[focusedFrameIdx]
+        ) {
+          soundSynth.play('DIAL_CLICK', soundEnabled);
+          setSelectedAssetId(activeCaptures[focusedFrameIdx]!.assetId);
+          navigate('/darkroom');
+        }
+      } else if (evt.key === 'Escape' || evt.key === 'm' || evt.key === 'M') {
+        evt.preventDefault();
+        navigate('/camera');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    activeCaptures,
+    activeRoll,
+    focusedFrameIdx,
+    navigate,
+     setSelectedAssetId,
+    soundEnabled,
+    startRollDevelop
+  ]);
 
   useEffect(() => {
     if (activeRoll?.status !== 'DEVELOPING') {
@@ -396,13 +456,19 @@ export const RollsPage: React.FC = () => {
               className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
               data-testid="contact-sheet-grid"
             >
-              {activeCaptures.map((cap) => {
+              {activeCaptures.map((cap, idx) => {
                 const asset = assets.find((a) => a.id === cap.assetId);
+                const isFocused = idx === focusedFrameIdx;
                 return (
                   <div
                     key={cap.captureId}
                     data-testid={`contact-frame-${cap.frameIndex}`}
-                    className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden flex flex-col justify-between shadow-lg"
+                    onClick={() => setFocusedFrameIdx(idx)}
+                    className={`bg-zinc-900 border rounded-xl overflow-hidden flex flex-col justify-between shadow-lg transition ${
+                      isFocused
+                        ? 'border-amber-400 ring-1 ring-amber-400/50'
+                        : 'border-zinc-800'
+                    }`}
                   >
                     {/* Top Sprocket Strip */}
                     <div className="bg-black px-3 py-1.5 flex items-center justify-between font-mono text-[11px] text-amber-400 border-b border-zinc-800">

@@ -9,7 +9,9 @@ import {
   computeAbsoluteDifferenceBuffer,
   estimateTranslationOffsetNcc
 } from '@camera-lab/image-core';
+import { soundSynth } from '../adapters/soundSynth.js';
 import { useCameraLab } from '../app/CameraLabProvider.js';
+import { useUiStore } from '../stores/uiStore.js';
 
 const GHOST_PAIR_PRESETS = [
   {
@@ -41,6 +43,7 @@ export const GhostPage: React.FC = () => {
     saveExportDerivative,
     resetFaultConfig
   } = useCameraLab();
+  const soundEnabled = useUiStore((s) => s.soundEnabled);
 
   const [sessionId, setSessionId] = useState<string>('ghost-default-session');
   const [sessionName, setSessionName] = useState<string>(
@@ -208,6 +211,47 @@ export const GhostPage: React.FC = () => {
       comparisonMode
     });
   };
+
+  useEffect(() => {
+    const handleKeyDown = (evt: KeyboardEvent) => {
+      const target = evt.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT')
+      ) {
+        return;
+      }
+      if (evt.key === 'ArrowLeft') {
+        evt.preventDefault();
+        soundSynth.play('DIAL_CLICK', soundEnabled);
+        updateParamAndPersist({ translationX: params.translationX - 0.02 });
+      } else if (evt.key === 'ArrowRight') {
+        evt.preventDefault();
+        soundSynth.play('DIAL_CLICK', soundEnabled);
+        updateParamAndPersist({ translationX: params.translationX + 0.02 });
+      } else if (evt.key === 'ArrowUp') {
+        evt.preventDefault();
+        soundSynth.play('DIAL_CLICK', soundEnabled);
+        updateParamAndPersist({ translationY: params.translationY - 0.02 });
+      } else if (evt.key === 'ArrowDown') {
+        evt.preventDefault();
+        soundSynth.play('DIAL_CLICK', soundEnabled);
+        updateParamAndPersist({ translationY: params.translationY + 0.02 });
+      } else if (evt.key === '[') {
+        evt.preventDefault();
+        soundSynth.play('DIAL_CLICK', soundEnabled);
+        updateParamAndPersist({ rotationDeg: params.rotationDeg - 1 });
+      } else if (evt.key === ']') {
+        evt.preventDefault();
+        soundSynth.play('DIAL_CLICK', soundEnabled);
+        updateParamAndPersist({ rotationDeg: params.rotationDeg + 1 });
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  });
 
   const handleSuggestAutoAlign = async () => {
     if (!refAsset || !curAsset) return;

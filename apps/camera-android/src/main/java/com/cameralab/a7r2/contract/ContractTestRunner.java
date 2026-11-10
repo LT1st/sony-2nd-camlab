@@ -1,22 +1,28 @@
 package com.cameralab.a7r2.contract;
 
+import com.cameralab.a7r2.adapter.CapabilityExplorer;
 import com.cameralab.a7r2.adapter.MockAndroidCameraAdapter;
 import com.cameralab.a7r2.adapter.SdCard83Logger;
+import com.cameralab.a7r2.domain.EventStreamReplayer;
 import com.cameralab.a7r2.domain.FilmRollState;
 import com.cameralab.a7r2.domain.GhostAffineMath;
 import com.cameralab.a7r2.port.CameraPort;
+import com.cameralab.a7r2.port.ScalarInputKeyMap;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 
 /**
- * M2 Host JVM Contract Test Runner.
+ * M2/M3 Host JVM Contract Test Runner.
  * Verifies that the Java implementation in apps/camera-android satisfies:
  *   1. Cross-platform state-machine vectors in tests/contracts/state-machine-vectors.json
  *   2. AC-08 idempotent duplicate capture.completed deduplication & auto-seal on full roll
  *   3. Ghost Viewfinder 2D affine matrix mathematical parity with TypeScript computeGhostAffineMatrix
  *   4. OpenMemories / Recipe Lab Exit Rule (restoring modified camera settings on closeSession)
  *   5. SD card 8.3 short filename constraint (CAMLAB/LOG0001.TXT) and privacy redaction
+ *   6. Sony ScalarInput ISV_KEY_* scanCode mapping & runtime override
+ *   7. M3 CapabilityExplorer read-only reflection probe (never treating unknown as available)
+ *   8. Cross-platform JSONL replay parity against tests/fixtures/capture-duplicate.jsonl
  */
 public final class ContractTestRunner {
     private static int passedTests = 0;
@@ -59,7 +65,6 @@ public final class ContractTestRunner {
         assertEquals(FilmRollState.Status.LOADED, roll.getStatus(), "Initial loaded status");
         assertEquals(Integer.valueOf(12), Integer.valueOf(roll.getRemainingFrames()), "Initial remaining frames");
 
-        // Strict review before develop must throw REVIEW_LOCKED_BEFORE_DEVELOP
         boolean threwReviewLock = false;
         try {
             roll.assertCanReview();
@@ -68,7 +73,6 @@ public final class ContractTestRunner {
         }
         assertTrue(threwReviewLock, "Strict roll must block review before development");
 
-        // Expose 3 frames + duplicate event (AC-08)
         roll = roll.onCaptureCompleted("cap-001");
         roll = roll.onCaptureCompleted("cap-001"); // Duplicate! Must be idempotent
         roll = roll.onCaptureCompleted("cap-002");
@@ -76,7 +80,6 @@ public final class ContractTestRunner {
         assertEquals(Integer.valueOf(3), Integer.valueOf(roll.getFrameIds().size()), "Duplicate captureId must be deduplicated");
         assertEquals(Integer.valueOf(9), Integer.valueOf(roll.getRemainingFrames()), "9 frames remaining after 3 unique captures");
 
-        // Early seal -> startDevelop -> interruptDevelop -> startDevelop -> completeDevelop -> archive
         roll = roll.seal();
         assertEquals(FilmRollState.Status.SEALED, roll.getStatus(), "Roll sealed");
 
@@ -95,7 +98,6 @@ public final class ContractTestRunner {
         roll = roll.startDevelop().completeDevelop();
         assertEquals(FilmRollState.Status.DEVELOPED, roll.getStatus(), "Roll developed");
 
-        // Review is now allowed
         roll.assertCanReview();
 
         roll = roll.archive();
@@ -111,21 +113,18 @@ public final class ContractTestRunner {
         assertEquals(FilmRollState.Status.SEALED, roll.getStatus(), "12th frame auto-seals roll");
         assertEquals(Integer.valueOf(0), Integer.valueOf(roll.getRemainingFrames()), "0 remaining");
 
-        // Duplicate of 12th frame arriving after auto-seal must still be idempotent
         FilmRollState afterDup = roll.onCaptureCompleted("cap-f12");
         assertEquals(Integer.valueOf(12), Integer.valueOf(afterDup.getFrameIds().size()), "Post-seal duplicate remains 12 frames");
         passedTests += 1;
     }
 
     private static void testGhostAffineMathParityWithTypeScript() {
-        // Identity transform on 960x640
         GhostAffineMath.Matrix2D identity = GhostAffineMath.computeMatrix(0.0, 0.0, 1.0, 0.0, 960, 640);
         assertEquals(Double.valueOf(1.0), Double.valueOf(identity.a), "Identity matrix a");
         assertEquals(Double.valueOf(0.0), Double.valueOf(identity.b), "Identity matrix b");
         assertEquals(Double.valueOf(0.0), Double.valueOf(identity.tx), "Identity matrix tx");
         assertEquals(Double.valueOf(0.0), Double.valueOf(identity.ty), "Identity matrix ty");
 
-        // Scale 1.2, rotation 10 deg, tx=0.06, ty=-0.04 on 960x640 (matches TypeScript computeGhostAffineMatrix)
         GhostAffineMath.Matrix2D m = GhostAffineMath.computeMatrix(0.06, -0.04, 1.2, 10.0, 960, 640);
         assertEquals(Double.valueOf(1.181769), Double.valueOf(m.a), "Affine matrix a parity");
         assertEquals(Double.valueOf(0.208378), Double.valueOf(m.b), "Affine matrix b parity");
@@ -148,7 +147,6 @@ public final class ContractTestRunner {
         adapter.modifyTemporarySetting("driveMode", "BRACKET_CONT");
         assertEquals("BRACKET_CONT", adapter.getSetting("driveMode"), "Temporary setting applied");
 
-        // On pause / exit, Exit Rule must restore original camera settings
         adapter.closeSession();
         assertEquals("NORMAL", adapter.getSetting("colorDepth"), "Exit Rule restored colorDepth to NORMAL");
         assertEquals("SINGLE", adapter.getSetting("driveMode"), "Exit Rule restored driveMode to SINGLE");
@@ -168,15 +166,78 @@ public final class ContractTestRunner {
         passedTests += 1;
     }
 
+    private static void testScalarInputKeyMapScanCodes() {
+        ScalarInputKeyMap keyMap = new ScalarInputKeyMap();
+        assertEquals(
+                ScalarInputKeyMap.PhysicalKeyCode.KEY_S1,
+                keyMap.resolveScanCode(ScalarInputKeyMap.ISV_KEY_S1_1),
+                "ISV_KEY_S1_1 maps to KEY_S1"
+        );
+        assertEquals(
+                ScalarInputKeyMap.PhysicalKeyCode.KEY_S2,
+                keyMap.resolveScanCode(ScalarInputKeyMap.ISV_KEY_S2),
+                "ISV_KEY_S2 maps to KEY_S2"
+        );
+        assertEquals(
+                ScalarInputKeyMap.PhysicalKeyCode.KEY_MENU,
+                keyMap.resolveScanCode(ScalarInputKeyMap.ISV_KEY_MENU),
+                "ISV_KEY_MENU maps to KEY_MENU"
+        );
+        keyMap.registerOverride(999, ScalarInputKeyMap.PhysicalKeyCode.KEY_FN);
+        assertEquals(
+                ScalarInputKeyMap.PhysicalKeyCode.KEY_FN,
+                keyMap.resolveScanCode(999),
+                "Custom body scanCode override works"
+        );
+        passedTests += 1;
+    }
+
+    private static void testCapabilityExplorerProbe() {
+        CapabilityExplorer.ProbeResult probe = CapabilityExplorer.probeRuntime(ContractTestRunner.class.getClassLoader());
+        assertEquals(Boolean.FALSE, Boolean.valueOf(probe.cameraExPresent), "Host JVM does not have com.sony.scalar.hardware.CameraEx");
+        assertEquals(
+                CameraPort.CapabilityState.SIMULATED,
+                probe.negotiatedCapabilities.liveView,
+                "Fallback liveView is SIMULATED"
+        );
+        assertEquals(
+                CameraPort.CapabilityState.UNAVAILABLE,
+                probe.negotiatedCapabilities.captureRAW,
+                "Unverified RAW capture is UNAVAILABLE"
+        );
+        String reportJson = probe.toReportJson("ILCE-7RM2");
+        assertTrue(reportJson.contains("PROBED_HOST_OR_EMULATOR_NO_SCALAR"), "Report JSON contains status");
+        passedTests += 1;
+    }
+
+    private static void testJsonlReplayParityWithTypeScript(String fixtureJsonlPath) throws IOException {
+        String jsonl = readFileText(fixtureJsonlPath);
+        EventStreamReplayer.ReplaySummary summary = EventStreamReplayer.replayJsonl(jsonl);
+        assertEquals(Integer.valueOf(6), Integer.valueOf(summary.appliedEventsCount), "6 events applied from capture-duplicate.jsonl");
+        assertEquals(Integer.valueOf(1), Integer.valueOf(summary.deduplicatedCapturesCount), "1 duplicate capture deduplicated");
+        assertEquals(Integer.valueOf(1), Integer.valueOf(summary.failedCapturesCount), "1 failed capture recorded");
+        assertEquals("roll-fix-12", summary.activeRollId, "Active roll ID matches TypeScript replay");
+
+        FilmRollState roll = summary.rolls.get("roll-fix-12");
+        assertTrue(roll != null, "Roll roll-fix-12 exists");
+        assertEquals(Integer.valueOf(3), Integer.valueOf(roll.getFrameIds().size()), "3 unique frames in roll-fix-12");
+        assertEquals(Integer.valueOf(9), Integer.valueOf(roll.getRemainingFrames()), "9 remaining frames in roll-fix-12");
+        passedTests += 1;
+    }
+
     public static void main(String[] args) throws Exception {
         String vectorsPath = args.length > 0 ? args[0] : "tests/contracts/state-machine-vectors.json";
+        String fixtureJsonlPath = args.length > 1 ? args[1] : "tests/fixtures/capture-duplicate.jsonl";
         testFilmRollLifecycleAndVectors(vectorsPath);
         testAutoSealOn12thFrameAndPostSealIdempotency();
         testGhostAffineMathParityWithTypeScript();
         testAndroidExitRuleAndCapabilities();
         testSdCard83LoggerAndPrivacyRedaction();
+        testScalarInputKeyMapScanCodes();
+        testCapabilityExplorerProbe();
+        testJsonlReplayParityWithTypeScript(fixtureJsonlPath);
         System.out.println(
-                "[java:contracts] PASS — " + passedTests + " M2 Java contract & Android adapter suites verified against " + vectorsPath
+                "[java:contracts] PASS — " + passedTests + " M2/M3 Java contract, keymap, probe & JSONL replay suites verified"
         );
     }
 }

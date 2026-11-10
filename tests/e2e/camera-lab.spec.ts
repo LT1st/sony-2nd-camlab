@@ -18,6 +18,16 @@ test.describe('Camera Lab · AC-01 through AC-12 Full E2E Acceptance Suite', () 
     await expect(page.getByTestId('launch-darkroom')).toBeVisible();
     await expect(page.getByTestId('launch-ghost')).toBeVisible();
 
+    // Verify default muted sound toggle and view mode switcher
+    await expect(page.getByTestId('toggle-sound-mode')).toContainText('静音');
+    await page.getByTestId('toggle-sound-mode').click();
+    await expect(page.getByTestId('toggle-sound-mode')).toContainText('开启');
+    await page.getByTestId('toggle-view-mode').click();
+    await expect(page.getByTestId('workspace-main')).toHaveAttribute(
+      'data-view-mode',
+      'DESKTOP_WORKBENCH'
+    );
+
     // Navigate to Film Camera page
     await page.getByTestId('launch-film').click();
     await expect(page.getByTestId('camera-page')).toBeVisible();
@@ -99,13 +109,17 @@ test.describe('Camera Lab · AC-01 through AC-12 Full E2E Acceptance Suite', () 
     await page.goto('/darkroom');
     await expect(page.getByTestId('darkroom-page')).toBeVisible();
 
-    // Verify SIMULATED badge in Mode A (AC-04)
+    // Verify SIMULATED badge in Mode A (AC-04) + Bayer Loupe HUD + Tone Curve SVG
     await expect(page.getByTestId('darkroom-mode-badge')).toContainText(
       'SIMULATED'
     );
     await expect(page.getByTestId('viewport-mode-tag')).toContainText(
       'SIMULATED'
     );
+    await expect(page.getByTestId('darkroom-bayer-loupe-hud')).toContainText(
+      'CFA:'
+    );
+    await expect(page.getByTestId('tone-curve-svg')).toBeVisible();
 
     // Step through stages and adjust parameters
     await page.getByTestId('stage-btn-RAW_SENSOR').click();

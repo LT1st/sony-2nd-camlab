@@ -35,6 +35,12 @@ function main() {
     'contracts',
     'state-machine-vectors.json'
   );
+  const fixtureJsonlPath = path.join(
+    rootDir,
+    'tests',
+    'fixtures',
+    'capture-duplicate.jsonl'
+  );
 
   const javaFiles = collectJavaFiles(javaSrcRoot);
   if (javaFiles.length === 0) {
@@ -55,7 +61,8 @@ function main() {
         '-cp',
         outDir,
         'com.cameralab.a7r2.contract.ContractTestRunner',
-        vectorsPath
+        vectorsPath,
+        fixtureJsonlPath
       ],
       { stdio: 'inherit' }
     );

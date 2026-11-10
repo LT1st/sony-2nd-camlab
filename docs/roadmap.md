@@ -17,6 +17,7 @@
 
 - [x] Sprint 6 设计先行：完成 `apps/camera-android` 架构规范、Java `CameraPort` 与 `FilmRollState` 骨架及旧 Android (API 10~16) 工具链版本冻结文档。
 - [x] v0.2.0 真实契约执行：实现零 AndroidX 依赖的 `FilmRollState`、`GhostAffineMath`、`MockAndroidCameraAdapter`（含 Exit Rule 参数还原）与 `SdCard83Logger`（FAT 8.3 短文件名校验与隐私脱敏），通过 `pnpm test:java`（`javac --release 8`）直接运行 `ContractTestRunner` 对齐 `tests/contracts/state-machine-vectors.json`。
+- [x] v0.3.0 物理交互与 M2/M3 桥接迭代：实现零外部音频文件的 Web Audio API 机械声效合成器（默认静音）、全模块物理快捷键操作、暗房 CFA 像素探针与实时 SVG 曲线图，以及 Java 端 `ScalarInputKeyMap`（`ISV_KEY_*` 扫描码映射）、`CapabilityExplorer`（只读反射能力探测）与 `EventStreamReplayer`（JSONL 事件流跨平台幂等重放）。
 
 ## M3：Sony α7R II (ILCE-7RM2) 真机安全探测与接入（远期规划 ⏳）
 

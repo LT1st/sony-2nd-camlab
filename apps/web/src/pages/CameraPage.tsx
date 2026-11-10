@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import type { PhysicalKeyCode } from '@camera-lab/camera-port';
 import type { FilmPreset, FilmRollCapacity } from '@camera-lab/contracts';
 import { SonyCameraChassis } from '@camera-lab/ui';
+import { soundSynth } from '../adapters/soundSynth.js';
 import { useCameraLab } from '../app/CameraLabProvider.js';
+import { useUiStore } from '../stores/uiStore.js';
 
 export const CameraPage: React.FC = () => {
   const navigate = useNavigate();
@@ -34,31 +36,46 @@ export const CameraPage: React.FC = () => {
   const [afLocked, setAfLocked] = useState(false);
   const [shutterFlash, setShutterFlash] = useState(false);
 
+  const soundEnabled = useUiStore((s) => s.soundEnabled);
+  const viewMode = useUiStore((s) => s.viewMode);
+
   const exposedCount = activeRoll?.frameIds.length ?? 0;
   const capacity = activeRoll?.capacity ?? 12;
   const remaining = Math.max(0, capacity - exposedCount);
 
   const triggerShutter = async () => {
+    soundSynth.play('SHUTTER_RELEASE', soundEnabled);
     setShutterFlash(true);
     setTimeout(() => setShutterFlash(false), 140);
-    await shutterCapture();
+    const res = await shutterCapture();
+    if (res) {
+      soundSynth.play('FILM_ADVANCE', soundEnabled);
+    } else {
+      soundSynth.play('ERROR_BEEP', soundEnabled);
+    }
   };
 
   const handlePhysicalKey = (key: PhysicalKeyCode) => {
     if (key === 'KEY_S1') {
+      soundSynth.play('AF_CONFIRM', soundEnabled);
       setAfLocked((prev) => !prev);
     } else if (key === 'KEY_S2' || key === 'KEY_ENTER') {
       void triggerShutter();
     } else if (key === 'KEY_LEFT' || key === 'DIAL_CCW') {
+      soundSynth.play('DIAL_CLICK', soundEnabled);
       void refreshPreview(-1);
     } else if (key === 'KEY_RIGHT' || key === 'DIAL_CW') {
+      soundSynth.play('DIAL_CLICK', soundEnabled);
       void refreshPreview(1);
     } else if (key === 'KEY_PLAY') {
       const allowed = attemptReviewActiveRoll();
       if (allowed) {
         navigate('/rolls');
+      } else {
+        soundSynth.play('ERROR_BEEP', soundEnabled);
       }
     } else if (key === 'KEY_MENU') {
+      soundSynth.play('DIAL_CLICK', soundEnabled);
       navigate('/');
     }
   };
@@ -136,6 +153,9 @@ export const CameraPage: React.FC = () => {
               </span>
               <span className="text-emerald-400">
                 剩余 <strong data-testid="vf-remaining-count">{remaining}</strong>
+              </span>
+              <span className="text-zinc-400 font-mono">
+                [{viewMode === 'CAMERA_SIMULATOR' ? 'SIM' : 'WORKBENCH'}]
               </span>
             </div>
 

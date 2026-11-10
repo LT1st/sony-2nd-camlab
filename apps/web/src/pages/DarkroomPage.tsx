@@ -14,7 +14,10 @@ import {
 } from '@camera-lab/domain';
 import {
   computeHistogram,
-  type ImageHistogram
+  type BayerPhotositeSample,
+  type ImageHistogram,
+  applyToneCurveSample,
+  samplePixelAndBayerSite
 } from '@camera-lab/image-core';
 import {
   darkroomProcessor,
@@ -22,6 +25,7 @@ import {
   rawDemoCatalog,
   rawDemoMetadata
 } from '../adapters/runtime.js';
+import { soundSynth } from '../adapters/soundSynth.js';
 import { useCameraLab } from '../app/CameraLabProvider.js';
 import { useUiStore } from '../stores/uiStore.js';
 
@@ -49,6 +53,7 @@ export const DarkroomPage: React.FC = () => {
   const speedMultiplier = useUiStore((s) => s.developSpeedMultiplier);
   const setSpeedMultiplier = useUiStore((s) => s.setDevelopSpeedMultiplier);
   const setLastExportLatencyMs = useUiStore((s) => s.setLastExportLatencyMs);
+  const soundEnabled = useUiStore((s) => s.soundEnabled);
 
   const [pipelineMode, setPipelineMode] =
     useState<ImagePipelineMode>('JPEG_SIMULATION');
@@ -62,9 +67,20 @@ export const DarkroomPage: React.FC = () => {
   const [activeJobId, setActiveJobId] = useState('job-init');
   const [histogram, setHistogram] = useState<ImageHistogram | null>(null);
   const [exportBanner, setExportBanner] = useState<string | null>(null);
+  const [loupeEnabled, setLoupeEnabled] = useState<boolean>(true);
+  const [loupeSample, setLoupeSample] = useState<BayerPhotositeSample>({
+    x: 360,
+    y: 240,
+    bayerChannel: 'R',
+    r: 168,
+    g: 142,
+    b: 118,
+    luma: 147
+  });
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sourceImageDataRef = useRef<ImageData | null>(null);
+  const latestProcessedDataRef = useRef<ImageData | null>(null);
 
   const currentAsset =
     assets.find((a) => a.id === selectedAssetId) ?? assets[0]!;
@@ -102,6 +118,57 @@ export const DarkroomPage: React.FC = () => {
     };
   }, [histogram]);
 
+  const toneCurvePolyline = useMemo(() => {
+    const evGain = Math.pow(2, recipe.exposureEv * 0.65);
+    const contrastFactor =
+      (259 * (recipe.contrast * 1.8 + 255)) /
+      (255 * (259 - recipe.contrast * 1.8));
+    const pts: string[] = [];
+    for (let i = 0; i <= 32; i++) {
+      const xNorm = i / 32;
+      const curved = applyToneCurveSample(xNorm * evGain, recipe.toneCurve) * 255;
+      const contrasted = Math.max(
+        0,
+        Math.min(255, contrastFactor * (curved - 128) + 128)
+      );
+      const svgX = (xNorm * 120).toFixed(1);
+      const svgY = (48 - (contrasted / 255) * 44).toFixed(1);
+      pts.push(`${svgX},${svgY}`);
+    }
+    return pts.join(' ');
+  }, [recipe.contrast, recipe.exposureEv, recipe.toneCurve]);
+
+  useEffect(() => {
+    const handleKeyDown = (evt: KeyboardEvent) => {
+      const target = evt.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT')
+      ) {
+        return;
+      }
+      if (evt.key === 'ArrowLeft' || evt.key === '[') {
+        evt.preventDefault();
+        soundSynth.play('DIAL_CLICK', soundEnabled);
+        setIsPlaying(false);
+        setCurrentStage((s) => advanceDevelopStage(s, -1));
+      } else if (evt.key === 'ArrowRight' || evt.key === ']') {
+        evt.preventDefault();
+        soundSynth.play('DIAL_CLICK', soundEnabled);
+        setIsPlaying(false);
+        setCurrentStage((s) => advanceDevelopStage(s, 1));
+      } else if (evt.key === ' ') {
+        evt.preventDefault();
+        soundSynth.play('DEVELOP_AGITATE', soundEnabled);
+        setIsPlaying((p) => !p);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [soundEnabled]);
+
   const renderSimulationStage = useCallback(
     async (
       baseData: ImageData,
@@ -127,6 +194,18 @@ export const DarkroomPage: React.FC = () => {
       setIsProcessing(false);
       setLastDurationMs(res.durationMs);
       setHistogram(res.histogram);
+      latestProcessedDataRef.current = res.imageData;
+      setLoupeSample((prev) =>
+        samplePixelAndBayerSite(
+          {
+            width: res.imageData.width,
+            height: res.imageData.height,
+            data: res.imageData.data
+          },
+          prev.x,
+          prev.y
+        )
+      );
 
       const canvas = canvasRef.current;
       if (canvas) {
@@ -192,6 +271,18 @@ export const DarkroomPage: React.FC = () => {
           );
         } else {
           // Compute real histogram from the precomputed RAW stage image
+          latestProcessedDataRef.current = imageData;
+          setLoupeSample((prev) =>
+            samplePixelAndBayerSite(
+              {
+                width: imageData.width,
+                height: imageData.height,
+                data: imageData.data
+              },
+              prev.x,
+              prev.y
+            )
+          );
           setHistogram(
             computeHistogram({
               width: imageData.width,
@@ -655,6 +746,15 @@ export const DarkroomPage: React.FC = () => {
                 />
                 <span>显影动画层</span>
               </label>
+
+              <label className="flex items-center gap-1.5 cursor-pointer text-zinc-300">
+                <input
+                  type="checkbox"
+                  checked={loupeEnabled}
+                  onChange={(e) => setLoupeEnabled(e.target.checked)}
+                />
+                <span>CFA 像素探针</span>
+              </label>
             </div>
           </div>
         </div>
@@ -683,8 +783,29 @@ export const DarkroomPage: React.FC = () => {
 
           {/* Stage Image Display Box (Animation layer separated from underlying stage image) */}
           <div
-            className="relative w-full aspect-[3/2] bg-black border-2 border-zinc-800 rounded-xl overflow-hidden flex items-center justify-center"
+            className="relative w-full aspect-[3/2] bg-black border-2 border-zinc-800 rounded-xl overflow-hidden flex items-center justify-center cursor-crosshair"
             data-testid="darkroom-stage-viewport"
+            onMouseMove={(evt) => {
+              const buf =
+                latestProcessedDataRef.current ?? sourceImageDataRef.current;
+              if (!buf) return;
+              const rect = evt.currentTarget.getBoundingClientRect();
+              const relX = Math.max(
+                0,
+                Math.min(1, (evt.clientX - rect.left) / Math.max(1, rect.width))
+              );
+              const relY = Math.max(
+                0,
+                Math.min(1, (evt.clientY - rect.top) / Math.max(1, rect.height))
+              );
+              setLoupeSample(
+                samplePixelAndBayerSite(
+                  { width: buf.width, height: buf.height, data: buf.data },
+                  Math.floor(relX * buf.width),
+                  Math.floor(relY * buf.height)
+                )
+              );
+            }}
           >
             {pipelineMode === 'JPEG_SIMULATION' ? (
               <canvas
@@ -718,6 +839,31 @@ export const DarkroomPage: React.FC = () => {
                 ? `SIMULATED · ${currentStage}`
                 : `RAW_PIPELINE_PRECOMPUTED · ${activeRawMeta.meta.cameraModel} · ${currentStage}`}
             </div>
+
+            {/* 1:1 Bayer Photosite & Pixel Inspector Readout */}
+            {loupeEnabled ? (
+              <div
+                className="pointer-events-none absolute bottom-3 right-3 px-2.5 py-1.5 rounded bg-black/85 border border-zinc-700 text-[11px] font-mono flex items-center gap-2.5 text-zinc-200"
+                data-testid="darkroom-bayer-loupe-hud"
+              >
+                <span
+                  className="w-3.5 h-3.5 rounded-sm border border-white/40 inline-block"
+                  style={{
+                    backgroundColor: `rgb(${loupeSample.r}, ${loupeSample.g}, ${loupeSample.b})`
+                  }}
+                />
+                <span>
+                  XY({loupeSample.x},{loupeSample.y})
+                </span>
+                <span className="text-amber-300 font-bold">
+                  CFA:{loupeSample.bayerChannel}
+                </span>
+                <span>
+                  RGB({loupeSample.r},{loupeSample.g},{loupeSample.b}) · Y=
+                  {loupeSample.luma}
+                </span>
+              </div>
+            ) : null}
           </div>
 
           {/* Stage Technical Explanation */}
@@ -983,24 +1129,47 @@ export const DarkroomPage: React.FC = () => {
                   />
                 </div>
 
-                <div>
+                <div className="space-y-1.5">
                   <label className="block mb-1">特征色调曲线 (Tone Curve)</label>
-                  <select
-                    value={recipe.toneCurve}
-                    onChange={(e) =>
-                      setRecipe((r) => ({
-                        ...r,
-                        toneCurve: e.target.value as ToneCurvePreset
-                      }))
-                    }
-                    data-testid="select-tone-curve"
-                    className="w-full px-3 py-1.5 rounded bg-zinc-950 border border-zinc-800 text-white"
-                  >
-                    <option value="S_CURVE_CLASSIC">S_CURVE_CLASSIC (经典 S 曲线)</option>
-                    <option value="MATTE_SHADOW">MATTE_SHADOW (胶片哑光暗部)</option>
-                    <option value="HIGH_KEY">HIGH_KEY (明亮清透)</option>
-                    <option value="LINEAR">LINEAR (线性反差)</option>
-                  </select>
+                  <div className="flex items-center gap-2.5">
+                    <select
+                      value={recipe.toneCurve}
+                      onChange={(e) =>
+                        setRecipe((r) => ({
+                          ...r,
+                          toneCurve: e.target.value as ToneCurvePreset
+                        }))
+                      }
+                      data-testid="select-tone-curve"
+                      className="flex-1 px-3 py-1.5 rounded bg-zinc-950 border border-zinc-800 text-white"
+                    >
+                      <option value="S_CURVE_CLASSIC">S_CURVE_CLASSIC (经典 S 曲线)</option>
+                      <option value="MATTE_SHADOW">MATTE_SHADOW (胶片哑光暗部)</option>
+                      <option value="HIGH_KEY">HIGH_KEY (明亮清透)</option>
+                      <option value="LINEAR">LINEAR (线性反差)</option>
+                    </select>
+                    <svg
+                      viewBox="0 0 120 48"
+                      data-testid="tone-curve-svg"
+                      className="w-28 h-12 bg-zinc-950 border border-zinc-800 rounded shrink-0"
+                    >
+                      <line
+                        x1="0"
+                        y1="48"
+                        x2="120"
+                        y2="4"
+                        stroke="#3f3f46"
+                        strokeDasharray="2,2"
+                        strokeWidth="1"
+                      />
+                      <polyline
+                        fill="none"
+                        stroke="#f59e0b"
+                        strokeWidth="2"
+                        points={toneCurvePolyline}
+                      />
+                    </svg>
+                  </div>
                 </div>
               </div>
             </div>

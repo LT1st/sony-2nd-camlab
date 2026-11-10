@@ -8,6 +8,8 @@ export const AppLayout: React.FC = () => {
     useCameraLab();
   const viewMode = useUiStore((s) => s.viewMode);
   const setViewMode = useUiStore((s) => s.setViewMode);
+  const soundEnabled = useUiStore((s) => s.soundEnabled);
+  const setSoundEnabled = useUiStore((s) => s.setSoundEnabled);
 
   const handleDrop: React.DragEventHandler<HTMLDivElement> = async (evt) => {
     evt.preventDefault();
@@ -86,6 +88,19 @@ export const AppLayout: React.FC = () => {
 
             <button
               type="button"
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              data-testid="toggle-sound-mode"
+              className={`text-xs font-mono px-2.5 py-1 rounded border transition ${
+                soundEnabled
+                  ? 'bg-amber-500/20 border-amber-400 text-amber-300 font-bold'
+                  : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-zinc-400'
+              }`}
+            >
+              声效: {soundEnabled ? '开启 (Synth)' : '静音'}
+            </button>
+
+            <button
+              type="button"
               onClick={() =>
                 setViewMode(
                   viewMode === 'CAMERA_SIMULATOR'
@@ -122,7 +137,13 @@ export const AppLayout: React.FC = () => {
       ) : null}
 
       {/* Main Content */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
+      <main
+        data-testid="workspace-main"
+        data-view-mode={viewMode}
+        className={`flex-1 w-full mx-auto px-4 py-6 ${
+          viewMode === 'DESKTOP_WORKBENCH' ? 'max-w-[1440px]' : 'max-w-7xl'
+        }`}
+      >
         <Outlet />
       </main>
 

@@ -16,7 +16,8 @@ import {
   estimateTranslationOffsetNcc,
   normalizeBufferByExifOrientation,
   parseJpegExifOrientation,
-  processStagePixelBuffer
+  processStagePixelBuffer,
+  samplePixelAndBayerSite
 } from '@camera-lab/image-core';
 
 describe('Darkroom Pipeline & Ghost Affine Engine', () => {
@@ -250,5 +251,21 @@ describe('Darkroom Pipeline & Ghost Affine Engine', () => {
     expect(rotated.height).toBe(2);
     expect(rotated.data[0]).toBe(10);
     expect(rotated.data[4]).toBe(200);
+
+    // Sample Bayer RGGB photosite coordinates (R at 0,0; G1 at 1,0; G2 at 0,1; B at 1,1)
+    const grid2x2 = {
+      width: 2,
+      height: 2,
+      data: new Uint8ClampedArray([
+        200, 20, 20, 255, // (0,0) R
+        20, 190, 20, 255, // (1,0) G1
+        20, 185, 20, 255, // (0,1) G2
+        20, 20, 210, 255  // (1,1) B
+      ])
+    };
+    expect(samplePixelAndBayerSite(grid2x2, 0, 0).bayerChannel).toBe('R');
+    expect(samplePixelAndBayerSite(grid2x2, 1, 0).bayerChannel).toBe('G1');
+    expect(samplePixelAndBayerSite(grid2x2, 0, 1).bayerChannel).toBe('G2');
+    expect(samplePixelAndBayerSite(grid2x2, 1, 1).bayerChannel).toBe('B');
   });
 });

@@ -28,6 +28,46 @@ export interface AutoAlignmentSuggestion {
   nccScore: number;
 }
 
+export interface BayerPhotositeSample {
+  x: number;
+  y: number;
+  bayerChannel: 'R' | 'G1' | 'G2' | 'B';
+  r: number;
+  g: number;
+  b: number;
+  luma: number;
+}
+
+/**
+ * Inspects a single pixel in an RGBA PixelBuffer and determines its 2x2 RGGB Bayer
+ * photosite channel ('R' at even row/col, 'G1' at even row/odd col, 'G2' at odd row/even col, 'B' at odd row/col).
+ */
+export function samplePixelAndBayerSite(
+  buffer: PixelBuffer,
+  x: number,
+  y: number
+): BayerPhotositeSample {
+  const cx = Math.max(0, Math.min(buffer.width - 1, Math.floor(x)));
+  const cy = Math.max(0, Math.min(buffer.height - 1, Math.floor(y)));
+  const idx = (cy * buffer.width + cx) * 4;
+  const r = buffer.data[idx] ?? 0;
+  const g = buffer.data[idx + 1] ?? 0;
+  const b = buffer.data[idx + 2] ?? 0;
+  const luma = clampByte(0.299 * r + 0.587 * g + 0.114 * b);
+
+  const rowEven = (cy & 1) === 0;
+  const colEven = (cx & 1) === 0;
+  const bayerChannel: 'R' | 'G1' | 'G2' | 'B' = rowEven
+    ? colEven
+      ? 'R'
+      : 'G1'
+    : colEven
+      ? 'G2'
+      : 'B';
+
+  return { x: cx, y: cy, bayerChannel, r, g, b, luma };
+}
+
 function clampByte(value: number): number {
   return value < 0 ? 0 : value > 255 ? 255 : Math.round(value);
 }
